@@ -1,0 +1,1 @@
+# ExpenseWise CLI package init

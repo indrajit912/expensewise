@@ -1,0 +1,576 @@
+{% extends "base.html" %}
+
+{% block title %}Expenses - ExpenseWise{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="font-outfit fw-bold mb-1">Expenses Registry</h1>
+            <p class="text-muted mb-0">Search, filter, and modify your recorded expenses</p>
+        </div>
+        <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Add Expense
+        </a>
+    </div>
+</div>
+
+<!-- Filters & Search Section -->
+<div class="card glass-card border-0 bg-white shadow-sm p-4 mb-4">
+    <form method="GET" action="{{ url_for('expenses.list_expenses') }}" class="row g-3">
+        <!-- Search text -->
+        <div class="col-md-3">
+            <label class="form-label">Search Query</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" name="search" class="form-control" placeholder="Search description, payee..." value="{{ search }}">
+            </div>
+        </div>
+        
+        <!-- Category Filter -->
+        <div class="col-md-2">
+            <label class="form-label">Category</label>
+            <select name="category" class="form-select">
+                <option value="">All Categories</option>
+                {% for cat in EXPENSE_CATEGORIES %}
+                    <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Date Range Filters -->
+        <div class="col-md-2">
+            <label class="form-label">Start Date</label>
+            <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+        </div>
+        
+        <div class="col-md-2">
+            <label class="form-label">End Date</label>
+            <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+        </div>
+
+        <!-- Sort criteria -->
+        <input type="hidden" name="sort_by" value="{{ sort_by }}">
+        <input type="hidden" name="order" value="{{ order }}">
+
+        <!-- Filter actions -->
+        <div class="col-md-3 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-funnel me-1"></i> Filter
+            </button>
+            <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary w-100">
+                Reset
+            </a>
+        </div>
+    </form>
+</div>
+</div>
+
+<!-- Summary Metric Cards -->
+<div class="row g-3 mb-4">
+    <!-- Card 1: Total Spent -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card glass-card border-0 bg-white p-3 h-100 shadow-sm border-start border-primary border-4">
+            <div class="text-secondary small fw-semibold text-uppercase text-truncate">Total Spent (Filtered)</div>
+            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ total_spending | currency_format(current_user.default_currency) }}</div>
+            <div class="text-muted small mt-2 text-truncate">
+                <i class="bi bi-receipt me-1"></i> Across {{ num_expenses }} transactions
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 2: Average Expense -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card glass-card border-0 bg-white p-3 h-100 shadow-sm border-start border-info border-4">
+            <div class="text-secondary small fw-semibold text-uppercase text-truncate">Average Transaction</div>
+            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ avg_expense | currency_format(current_user.default_currency) }}</div>
+            <div class="text-muted small mt-2 text-truncate">
+                <i class="bi bi-calculator me-1"></i> Average spent per ledger item
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Daily Average -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card glass-card border-0 bg-white p-3 h-100 shadow-sm border-start border-success border-4">
+            <div class="text-secondary small fw-semibold text-uppercase text-truncate">Average Daily Spending</div>
+            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ avg_daily | currency_format(current_user.default_currency) }}</div>
+            <div class="text-muted small mt-2 text-truncate">
+                <i class="bi bi-calendar-day me-1 text-success"></i> Wk: {{ avg_weekly | currency_format(current_user.default_currency) }} | Mo: {{ avg_monthly | currency_format(current_user.default_currency) }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Highest / Lowest -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card glass-card border-0 bg-white p-3 h-100 shadow-sm border-start border-warning border-4">
+            <div class="text-secondary small fw-semibold text-uppercase text-truncate">Extremes (Single)</div>
+            <div class="stat-value font-outfit fw-semibold text-dark fs-5 mt-1 text-truncate">
+                {% if highest_expense %}
+                    Max: {{ highest_expense.amount | currency_format(current_user.default_currency) }}
+                {% else %}
+                    Max: -
+                {% endif %}
+            </div>
+            <div class="text-muted small text-truncate">
+                {% if lowest_expense %}
+                    Min: {{ lowest_expense.amount | currency_format(current_user.default_currency) }}
+                {% else %}
+                    Min: -
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced Interactive Charts Row -->
+<div class="row g-4 mb-4">
+    <!-- Trend Line Chart -->
+    <div class="col-lg-6">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Filtered Spending Trend</h3>
+            <div class="chart-container" style="position: relative; height: 260px;">
+                <canvas id="expensesTrendChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Category Allocation Chart -->
+    <div class="col-lg-3">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Category Shares</h3>
+            <div class="chart-container d-flex align-items-center justify-content-center" style="position: relative; height: 260px;">
+                {% if cat_chart_labels %}
+                    <canvas id="expensesCategoryChart"></canvas>
+                {% else %}
+                    <div class="text-muted text-center">
+                        <i class="bi bi-pie-chart text-secondary display-6 mb-2"></i>
+                        <p class="mb-0 small">No category data.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Method Allocation Chart -->
+    <div class="col-lg-3">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Payment Methods</h3>
+            <div class="chart-container d-flex align-items-center justify-content-center" style="position: relative; height: 260px;">
+                {% if pm_chart_labels %}
+                    <canvas id="expensesPaymentChart"></canvas>
+                {% else %}
+                    <div class="text-muted text-center">
+                        <i class="bi bi-wallet2 text-secondary display-6 mb-2"></i>
+                        <p class="mb-0 small">No payment data.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Analytical Insights Grid -->
+<div class="row g-4 mb-4">
+    <!-- Date-Based & Category Insights -->
+    <div class="col-lg-6">
+        <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100">
+            <h3 class="h5 fw-bold font-outfit mb-3 text-dark"><i class="bi bi-calendar-range text-primary me-2"></i>Date & Category Insights</h3>
+            
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <div class="p-3 bg-light rounded-3 h-100">
+                        <div class="text-secondary small fw-semibold text-uppercase">Highest Spending Day</div>
+                        <div class="fw-bold font-outfit mt-1 text-dark">
+                            {% if highest_day[0] != 'N/A' %}
+                                {{ highest_day[0] }}
+                                <span class="text-primary d-block small font-normal">{{ highest_day[1] | currency_format(current_user.default_currency) }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 bg-light rounded-3 h-100">
+                        <div class="text-secondary small fw-semibold text-uppercase">Lowest Spending Day</div>
+                        <div class="fw-bold font-outfit mt-1 text-dark">
+                            {% if lowest_day[0] != 'N/A' %}
+                                {{ lowest_day[0] }}
+                                <span class="text-muted d-block small font-normal">{{ lowest_day[1] | currency_format(current_user.default_currency) }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 bg-light rounded-3 h-100">
+                        <div class="text-secondary small fw-semibold text-uppercase">Highest Spending Week</div>
+                        <div class="fw-bold font-outfit mt-1 text-dark">
+                            {% if highest_week[0] != 'N/A' %}
+                                {{ highest_week[0] }}
+                                <span class="text-primary d-block small font-normal">{{ highest_week[1] | currency_format(current_user.default_currency) }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 bg-light rounded-3 h-100">
+                        <div class="text-secondary small fw-semibold text-uppercase">Highest Spending Month</div>
+                        <div class="fw-bold font-outfit mt-1 text-dark">
+                            {% if highest_month[0] != 'N/A' %}
+                                {{ highest_month[0] }}
+                                <span class="text-primary d-block small font-normal">{{ highest_month[1] | currency_format(current_user.default_currency) }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <h4 class="h6 fw-bold font-outfit mb-3">Category Contributions</h4>
+            <div class="list-group list-group-flush">
+                <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-2 px-0">
+                    <span class="text-muted small">Top Spending Category</span>
+                    <span class="fw-bold font-outfit text-dark">
+                        {% if top_cat != 'N/A' %}
+                            {% set tc_color = CATEGORY_COLORS.get(top_cat, '#475569') %}
+                            <span class="badge me-2" style="background-color: {{ tc_color | hex_to_rgba(0.16) }}; color: {{ tc_color }};">{{ top_cat }}</span>
+                            {{ top_cat_amount | currency_format(current_user.default_currency) }} ({{ "{:.1f}".format(top_cat_pct) }}%)
+                        {% else %}
+                            -
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-2 px-0">
+                    <span class="text-muted small">Lowest Spending Category</span>
+                    <span class="fw-bold font-outfit text-dark">
+                        {% if lowest_cat != 'N/A' %}
+                            {% set lc_color = CATEGORY_COLORS.get(lowest_cat, '#475569') %}
+                            <span class="badge me-2" style="background-color: {{ lc_color | hex_to_rgba(0.16) }}; color: {{ lc_color }};">{{ lowest_cat }}</span>
+                            {{ lowest_cat_amount | currency_format(current_user.default_currency) }} ({{ "{:.1f}".format(lowest_cat_pct) }}%)
+                        {% else %}
+                            -
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment & Trend Comparison Insights -->
+    <div class="col-lg-6">
+        <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100">
+            <h3 class="h5 fw-bold font-outfit mb-3 text-dark"><i class="bi bi-wallet2 text-primary me-2"></i>Payment Channels & Trends</h3>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6">
+                    <div class="p-3 bg-light rounded-3 h-100">
+                        <div class="text-secondary small fw-semibold text-uppercase">Most Used Payment</div>
+                        <div class="fw-bold font-outfit mt-1 text-dark">
+                            {% if most_used_pm != 'N/A' %}
+                                {% set mup_color = PAYMENT_METHOD_COLORS.get(most_used_pm, '#475569') %}
+                                <span class="badge mb-1" style="background-color: {{ mup_color | hex_to_rgba(0.16) }}; color: {{ mup_color }};">{{ most_used_pm }}</span>
+                                <span class="d-block small text-muted font-normal">{{ most_used_pm_count }} transactions</span>
+                                <span class="d-block small text-dark fw-bold font-normal">{{ most_used_pm_amount | currency_format(current_user.default_currency) }} spent</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="p-3 bg-light rounded-3 h-100">
+                        <div class="text-secondary small fw-semibold text-uppercase">Least Used Payment</div>
+                        <div class="fw-bold font-outfit mt-1 text-dark">
+                            {% if least_used_pm != 'N/A' %}
+                                {% set lup_color = PAYMENT_METHOD_COLORS.get(least_used_pm, '#475569') %}
+                                <span class="badge mb-1" style="background-color: {{ lup_color | hex_to_rgba(0.16) }}; color: {{ lup_color }};">{{ least_used_pm }}</span>
+                                <span class="d-block small text-muted font-normal">{{ least_used_pm_count }} transactions</span>
+                                <span class="d-block small text-dark fw-bold font-normal">{{ least_used_pm_amount | currency_format(current_user.default_currency) }} spent</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <h4 class="h6 fw-bold font-outfit mb-3">Comparison Trend (vs. Preceding Period)</h4>
+            
+            <div class="p-3 rounded-3 {% if trend_spending_diff <= 0 %}bg-success-subtle text-success-emphasis{% else %}bg-danger-subtle text-danger-emphasis{% endif %} mb-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <span class="fw-bold font-outfit">
+                        Total spending {% if trend_spending_diff <= 0 %}decreased{% else %}increased{% endif %}
+                    </span>
+                    <span class="fs-5 fw-bold">
+                        {{ trend_spending_pct | abs | round(1) }}%
+                    </span>
+                </div>
+                <small class="opacity-75">
+                    Compared to preceding equivalent range ({{ delta_days }} days): {{ preceding_start.strftime('%b %d, %Y') }} – {{ preceding_end.strftime('%b %d, %Y') }}
+                </small>
+            </div>
+
+            <div class="small fw-semibold text-secondary text-uppercase mb-2">Category-Wise Shifts</div>
+            <div style="max-height: 120px; overflow-y: auto;">
+                <ul class="list-group list-group-flush">
+                    {% for item in trend_category_changes %}
+                        {% set cat_col = CATEGORY_COLORS.get(item.category, '#475569') %}
+                        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-2 px-0">
+                            <span class="badge" style="background-color: {{ cat_col | hex_to_rgba(0.16) }}; color: {{ cat_col }};">{{ item.category }}</span>
+                            <span class="fw-semibold {% if item.diff <= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {% if item.diff <= 0 %}-{% else %}+{% endif %}{{ item.diff | abs | currency_format(current_user.default_currency) }} 
+                                ({{ item.pct | abs | round(1) }}%)
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Registry Table Card -->
+<div class="card glass-card border-0 bg-white shadow-sm p-0 mb-4 overflow-hidden">
+    <div class="p-4 border-bottom d-flex justify-content-between align-items-center bg-white">
+        <h3 class="h5 fw-bold font-outfit mb-0">Record Ledger</h3>
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-sort-down me-1"></i> Sort: {{ 'Date' if sort_by == 'expense_date' else 'Amount' }} ({{ order | upper }})
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="sortDropdown">
+                <li><a class="dropdown-item" href="{{ url_for('expenses.list_expenses', search=search, category=category, start_date=start_date, end_date=end_date, sort_by='expense_date', order='desc') }}"><i class="bi bi-arrow-down me-2"></i> Date (Newest first)</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('expenses.list_expenses', search=search, category=category, start_date=start_date, end_date=end_date, sort_by='expense_date', order='asc') }}"><i class="bi bi-arrow-up me-2"></i> Date (Oldest first)</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('expenses.list_expenses', search=search, category=category, start_date=start_date, end_date=end_date, sort_by='amount', order='desc') }}"><i class="bi bi-sort-numeric-down me-2"></i> Amount (Highest first)</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('expenses.list_expenses', search=search, category=category, start_date=start_date, end_date=end_date, sort_by='amount', order='asc') }}"><i class="bi bi-sort-numeric-up me-2"></i> Amount (Lowest first)</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table align-middle table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">Date</th>
+                    <th>Category</th>
+                    <th>Payee</th>
+                    <th>Description</th>
+                    <th>Payment Mode</th>
+                    <th class="text-end">Amount</th>
+                    <th class="text-center pe-4" style="width: 130px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if expenses %}
+                    {% for exp in expenses %}
+                        <tr>
+                            <td class="ps-4 text-nowrap">{{ exp.expense_date.strftime('%b %d, %Y') }}</td>
+                            <td>
+                                {% set category_color = CATEGORY_COLORS.get(exp.category, '#475569') %}
+                                <span class="badge badge-category" style="background-color: {{ category_color | hex_to_rgba(0.16) }}; color: {{ category_color }};">
+                                    {{ exp.category }}
+                                </span>
+                            </td>
+                            <td class="text-truncate" style="max-width: 140px;">{{ exp.payee or '-' }}</td>
+                            <td class="text-truncate" style="max-width: 200px;">{{ exp.description or '-' }}</td>
+                            <td>
+                                {% if exp.payment_mode %}
+                                    {% set payment_color = PAYMENT_METHOD_COLORS.get(exp.payment_mode, '#475569') %}
+                                    <span class="badge badge-category" style="background-color: {{ payment_color | hex_to_rgba(0.16) }}; color: {{ payment_color }};">
+                                        <i class="bi {% if exp.payment_mode == 'Cash' %}bi-cash{% elif exp.payment_mode == 'Phonepe' %}bi-phone-vibrate{% elif exp.payment_mode == 'Card' %}bi-credit-card{% else %}bi-wallet2{% endif %} me-1 small"></i>
+                                        {{ exp.payment_mode }}
+                                    </span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-semibold">
+                                <div>{{ exp.amount | currency_format(current_user.default_currency) }}</div>
+                                {% if exp.original_currency != current_user.default_currency %}
+                                    <div class="text-muted small fw-normal font-monospace" style="font-size: 0.75rem;" title="Original entry amount">
+                                        ({{ exp.original_amount | currency_format(exp.original_currency) }})
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center pe-4">
+                                <a href="{{ url_for('expenses.edit_expense', uuid_str=exp.id) }}" class="btn btn-sm btn-link text-primary p-0 me-2" title="Edit">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </a>
+                                <form method="POST" action="{{ url_for('expenses.delete_expense', uuid_str=exp.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-link text-danger p-0 confirm-delete" title="Delete">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="bi bi-folder-x display-5 d-block mb-3 text-secondary"></i>
+                            No expenses found matching the filter criteria.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination controls -->
+    {% if pagination.pages > 1 %}
+        <div class="card-footer bg-white border-top p-4 d-flex justify-content-center">
+            <nav aria-label="Page navigation">
+                <ul class="pagination mb-0">
+                    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                        <a class="page-item page-link" href="{{ url_for('expenses.list_expenses', page=pagination.prev_num, search=search, category=category, start_date=start_date, end_date=end_date, sort_by=sort_by, order=order) if pagination.has_prev else '#' }}">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    
+                    {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('expenses.list_expenses', page=page_num, search=search, category=category, start_date=start_date, end_date=end_date, sort_by=sort_by, order=order) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('expenses.list_expenses', page=pagination.next_num, search=search, category=category, start_date=start_date, end_date=end_date, sort_by=sort_by, order=order) if pagination.has_next else '#' }}">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Filtered spending trend line chart
+    const trendCtx = document.getElementById('expensesTrendChart').getContext('2d');
+    const trendLabels = {{ trend_labels | tojson }};
+    const trendValues = {{ trend_values | tojson }};
+    
+    new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: trendLabels,
+            datasets: [{
+                label: 'Spending ({{ current_user.default_currency }})',
+                data: trendValues,
+                borderColor: '#4f46e5',
+                backgroundColor: 'rgba(79, 70, 229, 0.05)',
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.3,
+                pointBackgroundColor: '#4f46e5',
+                pointRadius: trendLabels.length > 31 ? 0 : 3,
+                pointHoverRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#64748b' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#64748b', maxTicksLimit: 10 }
+                }
+            }
+        }
+    });
+
+    // 2. Category allocation chart
+    {% if cat_chart_labels %}
+    const categoryCtx = document.getElementById('expensesCategoryChart').getContext('2d');
+    const catLabels = {{ cat_chart_labels | tojson }};
+    const catValues = {{ cat_chart_values | tojson }};
+    const catColors = {{ cat_chart_colors | tojson }};
+    
+    new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: catLabels,
+            datasets: [{
+                data: catValues,
+                backgroundColor: catColors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 10, padding: 6, font: { family: 'Inter', size: 10 } }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+    {% endif %}
+
+    // 3. Payment method allocation chart
+    {% if pm_chart_labels %}
+    const paymentCtx = document.getElementById('expensesPaymentChart').getContext('2d');
+    const pmLabels = {{ pm_chart_labels | tojson }};
+    const pmValues = {{ pm_chart_values | tojson }};
+    const pmColors = {{ pm_chart_colors | tojson }};
+    
+    new Chart(paymentCtx, {
+        type: 'doughnut',
+        data: {
+            labels: pmLabels,
+            datasets: [{
+                data: pmValues,
+                backgroundColor: pmColors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 10, padding: 6, font: { family: 'Inter', size: 10 } }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

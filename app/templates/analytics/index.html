@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics & Forecasts - ExpenseWise{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12">
+        <h1 class="font-outfit fw-bold mb-1">Analytics Engine</h1>
+        <p class="text-muted">Historical trends, category allocation metrics, and forecasting predictions</p>
+    </div>
+</div>
+
+<!-- Forecasting Block -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-gradient-primary border-0 text-white shadow p-4 rounded-3">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h3 class="h4 font-outfit fw-bold mb-2">
+                        <i class="bi bi-magic me-2"></i>Next Month spending projection
+                    </h3>
+                    <p class="mb-0 opacity-75">
+                        Our analytics engine fits a linear regression trend line over your past monthly transactions to calculate future spending patterns.
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                    <div class="text-uppercase small opacity-75">Estimated Expense</div>
+                    <div class="display-5 font-outfit fw-bold">{{ forecast_spending | currency_format(current_user.default_currency) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+    <!-- Bar Chart: 6 Months -->
+    <div class="col-lg-7">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">6-Month Spending History</h3>
+            <div class="chart-container" style="position: relative; height: 300px;">
+                {% if history_amounts %}
+                    <canvas id="historyChart"></canvas>
+                {% else %}
+                    <div class="text-muted text-center pt-5">
+                        <i class="bi bi-bar-chart display-6 text-secondary d-block mb-2"></i>
+                        No transaction history available.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Doughnut Chart: Category allocation -->
+    <div class="col-lg-5">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Category Distribution</h3>
+            <div class="chart-container d-flex align-items-center justify-content-center" style="position: relative; height: 300px;">
+                {% if category_dist %}
+                    <canvas id="categoryChart"></canvas>
+                {% else %}
+                    <div class="text-muted text-center">
+                        <i class="bi bi-pie-chart text-secondary display-6 mb-2"></i>
+                        <p class="mb-0">No expense records found.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QA Insights Cards -->
+<div class="row g-4">
+    <!-- Month over Month Analysis -->
+    <div class="col-md-6">
+        <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100">
+            <h3 class="h5 fw-bold font-outfit mb-3"><i class="bi bi-calendar-range text-primary me-2"></i>Month-over-Month Details</h3>
+            
+            <div class="list-group list-group-flush">
+                <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3">
+                    <span class="text-muted">This Month's Spending</span>
+                    <span class="fw-bold text-dark">{{ comp_metrics.this_month_total | currency_format(current_user.default_currency) }}</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3">
+                    <span class="text-muted">Previous Month's Spending</span>
+                    <span class="fw-bold text-dark">{{ comp_metrics.prev_month_total | currency_format(current_user.default_currency) }}</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3">
+                    <span class="text-muted">Net Change</span>
+                    {% set diff = comp_metrics.difference %}
+                    <span class="fw-bold {% if diff <= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if diff <= 0 %}-{% else %}+{% endif %}{{ (diff | abs) | currency_format(current_user.default_currency) }}
+                    </span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3">
+                    <span class="text-muted">Change (%)</span>
+                    {% set pct = comp_metrics.percentage_change %}
+                    <span class="fw-bold {% if diff <= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ "{:,.1f}%".format(pct) }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Shifts -->
+    <div class="col-md-6">
+        <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100">
+            <h3 class="h5 fw-bold font-outfit mb-3"><i class="bi bi-arrow-up-right-circle text-primary me-2"></i>Budget Allocation Shifts</h3>
+            
+            <div class="mb-4 pb-3 border-bottom">
+                <h4 class="h6 text-muted mb-2">Category with Greatest Spending Increase:</h4>
+                {% if comp_metrics.most_increased_category != 'N/A' %}
+                    <div class="d-flex align-items-center justify-content-between">
+                        {% set increase_color = CATEGORY_COLORS.get(comp_metrics.most_increased_category, '#475569') %}
+                        <span class="badge badge-category" style="background-color: {{ increase_color | hex_to_rgba(0.16) }}; color: {{ increase_color }};">
+                            {{ comp_metrics.most_increased_category }}
+                        </span>
+                        <span class="fw-bold text-danger">+{{ comp_metrics.most_increased_amount | currency_format(current_user.default_currency) }}</span>
+                    </div>
+                    <small class="text-muted mt-1 d-block">
+                        This category saw the largest cost expansion compared to previous month transactions.
+                    </small>
+                {% else %}
+                    <div class="text-muted small">No expansion category identified.</div>
+                {% endif %}
+            </div>
+
+            <div>
+                <h4 class="h6 text-muted mb-3">Top Allocation Categories (All Time):</h4>
+                {% if category_dist %}
+                    {% for cat, amt in category_dist.items()|list %}
+                        {% if loop.index <= 3 %}
+                            {% set cat_color = CATEGORY_COLORS.get(cat, '#475569') %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge badge-category" style="background-color: {{ cat_color | hex_to_rgba(0.16) }}; color: {{ cat_color }};">{{ cat }}</span>
+                                <span class="fw-semibold text-dark">{{ amt | currency_format(current_user.default_currency) }}</span>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div class="text-muted small">No records compiled.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. History Bar Chart
+    {% if history_amounts %}
+    const historyCtx = document.getElementById('historyChart').getContext('2d');
+    const months = {{ history_months | tojson }};
+    const amounts = {{ history_amounts | tojson }};
+    
+    new Chart(historyCtx, {
+        type: 'bar',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Monthly Total Spending ({{ current_user.default_currency }})',
+                data: amounts,
+                backgroundColor: 'rgba(79, 70, 229, 0.75)',
+                borderColor: '#4f46e5',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#64748b' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#64748b' }
+                }
+            }
+        }
+    });
+    {% endif %}
+
+    // 2. Category allocation Doughnut
+    {% if category_dist %}
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    const catData = {{ category_dist | tojson }};
+    
+    const catLabels = Object.keys(catData);
+    const catValues = Object.values(catData);
+    
+    const categoryColors = {{ CATEGORY_COLORS | tojson }};
+    const colors = catLabels.map(label => categoryColors[label] || '#64748b');
+    
+    new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: catLabels,
+            datasets: [{
+                data: catValues,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { boxWidth: 12, padding: 8, font: { family: 'Inter', size: 11 } }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

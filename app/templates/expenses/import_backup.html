@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Backup & Restore - ExpenseWise{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12">
+        <h1 class="font-outfit fw-bold mb-1">Backup & Restore Center</h1>
+        <p class="text-muted">Securely export your data or restore your registry from an ExpenseWise backup</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Restore / Ingestion Panel -->
+    <div class="col-md-6">
+        <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100">
+            <h3 class="h5 fw-bold font-outfit mb-3">
+                <i class="bi bi-shield-lock-fill text-primary me-2"></i>Database Restore & Import
+            </h3>
+            <p class="text-muted small mb-3">
+                Upload your versioned <strong>JSON Backup (v2.0)</strong> to restore your profile settings, categories, payment methods, and transaction ledger. 
+            </p>
+            
+            <div class="bg-light rounded p-3 mb-4 border-start border-primary border-3">
+                <h6 class="fw-bold font-outfit small text-dark mb-2">JSON Backup Integrity Checks:</h6>
+                <ul class="text-muted small mb-0 ps-3">
+                    <li>Verifies JSON structure compatibility & version check.</li>
+                    <li>Performs multi-point validation (UUID consistency & references).</li>
+                    <li>Auto-merges categories & payment methods by name, syncing colors.</li>
+                    <li>Re-encrypts all transaction details under your account's active security keys.</li>
+                </ul>
+            </div>
+            
+            <p class="text-muted small mb-3">
+                <em>Note: CSV spreadsheets and legacy JSON lists are also supported for basic transaction ingestion.</em>
+            </p>
+
+            <form method="POST" action="{{ url_for('expenses.import_backup') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <input class="form-control" type="file" id="backup_file" name="backup_file" accept=".json,.csv" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2">
+                    <i class="bi bi-cloud-arrow-up me-2"></i> Upload & View Preview
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Export / Backup Panel -->
+    <div class="col-md-6">
+        <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100 d-flex flex-column">
+            <h3 class="h5 fw-bold font-outfit mb-3">
+                <i class="bi bi-cloud-download-fill text-primary me-2"></i>Data Backups & Exports
+            </h3>
+            <p class="text-muted small mb-3">
+                Create portable offline backups of your entire financial profile. Backups are exported in plaintext format for portability across accounts, but will be re-encrypted automatically on restore.
+            </p>
+            
+            <div class="bg-light rounded p-3 mb-4 border-start border-success border-3">
+                <h6 class="fw-bold font-outfit small text-dark mb-2">Export Contents:</h6>
+                <ul class="text-muted small mb-0 ps-3">
+                    <li>Database export version meta tags (v2.0)</li>
+                    <li>Custom Category registry & associated colors</li>
+                    <li>Custom Payment Method registry & associated colors</li>
+                    <li>Full transaction history (dates, payees, amounts, descriptions)</li>
+                </ul>
+            </div>
+
+            <div class="d-flex flex-column gap-2 mt-auto">
+                <a href="{{ url_for('expenses.export_expenses', format='json') }}" class="btn btn-success py-2 w-100">
+                    <i class="bi bi-filetype-json me-2"></i> Download JSON Backup (v2.0)
+                </a>
+                <a href="{{ url_for('expenses.export_expenses', format='csv') }}" class="btn btn-outline-secondary py-2 w-100">
+                    <i class="bi bi-filetype-csv me-2"></i> Download CSV Spreadsheet
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

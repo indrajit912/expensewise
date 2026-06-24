@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - ExpenseWise{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="font-outfit fw-bold mb-1">Financial Dashboard</h1>
+            <p class="text-muted mb-0">Overview of your spending habits and financial metrics</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i> Add Expense
+            </a>
+            <a href="{{ url_for('expenses.import_backup') }}" class="btn btn-outline-primary">
+                <i class="bi bi-cloud-arrow-up me-1"></i> Backup & Restore
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics Cards Row -->
+<div class="row g-3 mb-4">
+    <!-- Card 1: Total Spent -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card glass-card border-0 metric-card bg-white p-3 h-100">
+            <div class="text-secondary small fw-semibold text-uppercase">Spent (Last 30 Days)</div>
+            <div class="stat-value">{{ metrics.total_spending | currency_format(current_user.default_currency) }}</div>
+            <div class="text-muted small mt-2">
+                <i class="bi bi-calendar-event me-1"></i> Rolling 30-day period
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 2: Daily Average -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card glass-card border-0 metric-card info bg-white p-3 h-100">
+            <div class="text-secondary small fw-semibold text-uppercase">Daily Average</div>
+            <div class="stat-value">{{ metrics.daily_average | currency_format(current_user.default_currency) }}</div>
+            <div class="text-muted small mt-2">
+                <i class="bi bi-calculator me-1"></i> Total / 30 days
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 3: Top Category -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card glass-card border-0 metric-card warning bg-white p-3 h-100">
+            <div class="text-secondary small fw-semibold text-uppercase">Top Category</div>
+            <div class="stat-value font-outfit text-truncate" style="font-size: 1.5rem; margin-top: 0.5rem;">
+                {{ metrics.top_category }}
+            </div>
+            <div class="text-muted small mt-2">
+                <i class="bi bi-tag-fill me-1"></i> Spent: {{ metrics.top_category_amount | currency_format(current_user.default_currency) }}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 4: Month comparison -->
+    <div class="col-sm-6 col-lg-3">
+        {% set diff = comp_metrics.difference %}
+        {% set pct = comp_metrics.percentage_change %}
+        <div class="card glass-card border-0 metric-card {% if diff <= 0 %}success{% else %}danger{% endif %} bg-white p-3 h-100">
+            <div class="text-secondary small fw-semibold text-uppercase">Vs. Previous Month</div>
+            <div class="stat-value {% if diff <= 0 %}text-success{% else %}text-danger{% endif %}">
+                {% if diff <= 0 %}-{% else %}+{% endif %}{{ (diff | abs) | currency_format(current_user.default_currency) }}
+            </div>
+            <div class="small mt-2 {% if diff <= 0 %}text-success{% else %}text-danger{% endif %}">
+                <i class="bi {% if diff <= 0 %}bi-arrow-down-short{% else %}bi-arrow-up-short{% endif %} fs-6"></i>
+                {{ "{:,.1f}%".format(pct | abs) }} change this month
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Grid -->
+<div class="row g-4 mb-4">
+    <!-- Line Chart: Daily Spending -->
+    <div class="col-lg-8">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Spending Trend (Last 30 Days)</h3>
+            <div class="chart-container" style="position: relative; height: 300px;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pie Chart: Category Shares -->
+    <div class="col-lg-4">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Category Allocation</h3>
+            <div class="chart-container d-flex align-items-center justify-content-center" style="position: relative; height: 300px;">
+                {% if category_dist %}
+                    <canvas id="categoryChart"></canvas>
+                {% else %}
+                    <div class="text-muted text-center">
+                        <i class="bi bi-pie-chart text-secondary display-6 mb-2"></i>
+                        <p class="mb-0">No data available for the last 30 days.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Recent Transactions -->
+    <div class="col-lg-8">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h5 fw-bold font-outfit mb-0">Recent Expenses</h3>
+                <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Payee</th>
+                            <th>Description</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if recent_expenses %}
+                            {% for exp in recent_expenses %}
+                                <tr>
+                                    <td class="text-nowrap">{{ exp.expense_date.strftime('%b %d, %Y') }}</td>
+                                    <td>
+                                        {% set category_color = CATEGORY_COLORS.get(exp.category, '#475569') %}
+                                    <span class="badge badge-category" style="background-color: {{ category_color | hex_to_rgba(0.16) }}; color: {{ category_color }};">
+                                            {{ exp.category }}
+                                        </span>
+                                    </td>
+                                    <td class="text-truncate" style="max-width: 120px;">{{ exp.payee or '-' }}</td>
+                                    <td class="text-truncate" style="max-width: 180px;">{{ exp.description or '-' }}</td>
+                                    <td class="text-end fw-semibold">
+                                        <div>{{ exp.amount | currency_format(current_user.default_currency) }}</div>
+                                        {% if exp.original_currency != current_user.default_currency %}
+                                            <div class="text-muted small fw-normal font-monospace" style="font-size: 0.7rem;" title="Original entry amount">
+                                                ({{ exp.original_amount | currency_format(exp.original_currency) }})
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    <i class="bi bi-file-earmark-plus display-6 d-block mb-2 text-secondary"></i>
+                                    No expenses recorded yet. Click "Add Expense" to get started!
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Insights Summary Column -->
+    <div class="col-lg-4">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Expense Insights</h3>
+            
+            <div class="mb-4">
+                <div class="text-muted small">Most volatile Category</div>
+                <div class="fw-semibold fs-5 text-dark font-outfit">
+                    {% if comp_metrics.most_increased_category != 'N/A' %}
+                        {{ comp_metrics.most_increased_category }} 
+                        <span class="text-danger small fw-normal">(+{{ comp_metrics.most_increased_amount | currency_format(current_user.default_currency) }})</span>
+                    {% else %}
+                        No variation
+                    {% endif %}
+                </div>
+                <div class="small text-secondary">Compared to the previous month's expenditures.</div>
+            </div>
+            
+            <div class="mb-4">
+                <div class="text-muted small">Highest Spending Day (Last 30 Days)</div>
+                <div class="fw-semibold fs-5 text-dark font-outfit">
+                    {% if metrics.highest_spending_day.date %}
+                        {{ metrics.highest_spending_day.date }}
+                        <span class="text-primary small fw-normal">({{ metrics.highest_spending_day.amount | currency_format(current_user.default_currency) }})</span>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="p-3 bg-light rounded-3 border mb-3">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="bi bi-lightning-charge-fill text-warning me-2 fs-5"></i>
+                    <span class="fw-bold font-outfit text-uppercase small text-dark">Predictive Analytics</span>
+                </div>
+                <p class="text-muted small mb-0">
+                    Want to see your detailed spending history, 6-month comparisons, and predictive forecasts?
+                </p>
+                <a href="{{ url_for('analytics.index') }}" class="btn btn-sm btn-primary mt-3 w-100">
+                    <i class="bi bi-graph-up me-1"></i> Forecast & Analytics
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Daily Trend Line Chart
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    
+    // Injecting Jinja data
+    const dailyLabels = {{ daily_labels | tojson }};
+    const dailyValues = {{ daily_values | tojson }};
+    
+    new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: dailyLabels,
+            datasets: [{
+                label: 'Spending ({{ current_user.default_currency }})',
+                data: dailyValues,
+                borderColor: '#4f46e5',
+                backgroundColor: 'rgba(79, 70, 229, 0.05)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointBackgroundColor: '#4f46e5',
+                pointRadius: 2,
+                pointHoverRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#64748b' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#64748b', maxTicksLimit: 10 }
+                }
+            }
+        }
+    });
+
+    // 2. Category Pie Chart
+    {% if category_dist %}
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    const catData = {{ category_dist | tojson }};
+    
+    const catLabels = Object.keys(catData);
+    const catValues = Object.values(catData);
+    
+    const categoryColors = {{ CATEGORY_COLORS | tojson }};
+    const colors = catLabels.map(label => categoryColors[label] || '#64748b');
+    
+    new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: catLabels,
+            datasets: [{
+                data: catValues,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 12, padding: 8, font: { family: 'Inter', size: 11 } }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Staging Preview - ExpenseWise{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12">
+        <h1 class="font-outfit fw-bold mb-1">{% if file_type == 'json' %}Backup Restore Preview{% else %}CSV Staging Preview{% endif %}</h1>
+        <p class="text-muted">Review data validation status and parsed entries before completing database updates</p>
+    </div>
+</div>
+
+{% if checklist %}
+<div class="card glass-card border-0 bg-white shadow-sm p-4 mb-4">
+    <div class="d-flex align-items-center mb-3 pb-3 border-bottom">
+        <h3 class="h5 fw-bold font-outfit mb-0">
+            <i class="bi bi-shield-check text-primary me-2"></i>Backup Integrity Checklist
+        </h3>
+    </div>
+    
+    <div class="row row-cols-1 row-cols-md-2 g-3 mb-3">
+        {% for key, check in checklist.items() %}
+        <div class="col">
+            <div class="p-3 border rounded h-100 d-flex align-items-start bg-light-subtle">
+                {% if check.status %}
+                    <span class="text-success me-3 fs-4"><i class="bi bi-check-circle-fill"></i></span>
+                {% else %}
+                    <span class="text-danger me-3 fs-4"><i class="bi bi-exclamation-octagon-fill"></i></span>
+                {% endif %}
+                <div>
+                    <h5 class="h6 mb-1 fw-bold text-dark">{{ check.title }}</h5>
+                    <p class="mb-0 text-muted small" style="line-height: 1.3;">{{ check.message }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not is_valid %}
+        <div class="alert alert-danger mb-0" role="alert">
+            <i class="bi bi-x-octagon-fill me-2"></i>
+            <strong>Restore Blocked:</strong> One or more backup integrity checks failed. Importing is disabled until schema requirements are satisfied.
+        </div>
+    {% else %}
+        <div class="alert alert-success mb-0" role="alert">
+            <i class="bi bi-patch-check-fill me-2"></i>
+            <strong>Integrity Verified:</strong> Backup database matches schema requirements. Ready for restoration.
+        </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="card glass-card border-0 bg-white shadow-sm p-4 mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
+        <div>
+            <h3 class="h5 fw-bold font-outfit mb-1">Upload Summary</h3>
+            <span class="text-secondary small">Staged sheet rows: <strong>{{ total_rows }}</strong></span>
+        </div>
+        <div class="d-flex gap-2">
+            <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" name="action" value="cancel" class="btn btn-outline-secondary">
+                    Cancel Import
+                </button>
+                <button type="submit" name="action" value="confirm" class="btn btn-success px-4" {% if not is_valid %}disabled title="Fix checklist errors to enable import"{% endif %}>
+                    Confirm & Bulk Insert
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <h4 class="h6 fw-semibold text-secondary mb-3">Detected Column Mapping:</h4>
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        {% for header in headers %}
+            <span class="badge bg-light text-dark border px-3 py-2 font-monospace">{{ header }}</span>
+        {% endfor %}
+    </div>
+
+    <h4 class="h6 fw-semibold text-secondary mb-3">Staged Rows Preview (Top 8):</h4>
+    <div class="table-responsive">
+        <table class="table align-middle table-striped table-hover border small mb-0">
+            <thead class="table-light">
+                <tr>
+                    {% for header in headers %}
+                        <th>{{ header }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        {% for header in headers %}
+                            <td>{{ row[header] if row[header] is not none else '-' }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if file_type == 'json' %}
+        <div class="alert alert-warning mt-4 mb-0" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2 text-warning fs-5"></i>
+            <strong>Destructive Restore Warning:</strong> Restoring this backup will <strong>completely delete your current expense history</strong> to rebuild your registry from the backup dataset cleanly. Categories and Payment methods with matching names will be merged and their colors synced to match the backup database.
+        </div>
+    {% else %}
+        <div class="alert alert-info mt-4 mb-0" role="alert">
+            <i class="bi bi-info-circle-fill me-2 text-info fs-5"></i>
+            <strong>Duplicate Check:</strong> Confirming the import will execute deduplication. Staged entries matching existing dates, amounts, categories, and descriptions will be automatically skipped to prevent double-counting.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}ExpenseWise - Intelligent Personal Finance Management{% endblock %}
+
+{% block content %}
+<div class="my-5">
+    <!-- Hero Header -->
+    <div class="hero-section text-light text-center p-5 mb-5 shadow-lg">
+        <div class="row justify-content-center py-4">
+            <div class="col-lg-8">
+                <i class="bi bi-wallet2 text-primary display-2 mb-3"></i>
+                <div class="mb-3">
+                    <span class="badge bg-secondary-subtle text-primary border border-primary-subtle px-3 py-2 font-monospace">
+                        Created by <a href="https://indrajitghosh.onrender.com" target="_blank" class="text-primary text-decoration-none fw-semibold">Indrajit Ghosh</a> (IIT Kanpur)
+                    </span>
+                </div>
+                <h1 class="display-4 fw-extrabold font-outfit tracking-tight mb-3">
+                    Master Your Money with <span class="text-primary">ExpenseWise</span>
+                </h1>
+                <p class="lead text-secondary fs-4 mb-4">
+                    A secure, production-grade personal expense manager featuring real-time insights, interactive charts, legacy CLI migrations, and developer APIs.
+                </p>
+                <div class="d-flex justify-content-center gap-3 mb-4">
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg px-4 py-3 shadow">
+                        <i class="bi bi-rocket-takeoff me-2"></i> Get Started Free
+                    </a>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-light btn-lg px-4 py-3">
+                        <i class="bi bi-box-arrow-in-right me-2"></i> Access Account
+                    </a>
+                </div>
+
+                <!-- Guest Demo Account Credentials Banner -->
+                <div class="card bg-white bg-opacity-10 border border-white border-opacity-10 rounded-3 p-3 text-start mx-auto shadow-sm" style="max-width: 500px; backdrop-filter: blur(10px);">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-success-subtle text-success border border-success-subtle me-2 px-2 py-1 font-monospace fw-bold">DEMO MODE</span>
+                        <span class="text-secondary small">Explore the application instantly without registration:</span>
+                    </div>
+                    <div class="row g-2 text-light small">
+                        <div class="col-sm-6 d-flex align-items-center">
+                            <span class="text-secondary me-2">Username:</span>
+                            <code class="text-info bg-dark bg-opacity-50 px-2 py-1 rounded border border-secondary border-opacity-50">guest</code>
+                        </div>
+                        <div class="col-sm-6 d-flex align-items-center">
+                            <span class="text-secondary me-2">Password:</span>
+                            <code class="text-info bg-dark bg-opacity-50 px-2 py-1 rounded border border-secondary border-opacity-50">password</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature Grid -->
+    <div class="row g-4 mt-4">
+        <!-- Feature 1 -->
+        <div class="col-md-4">
+            <div class="card glass-card border-0 h-100 p-3">
+                <div class="card-body">
+                    <div class="text-primary mb-3">
+                        <i class="bi bi-shield-check fs-2"></i>
+                    </div>
+                    <h3 class="h5 fw-bold font-outfit mb-2">Secure Multi-User Auth</h3>
+                    <p class="text-muted mb-0">Every user's budget database is sandboxed. Hashed password keys, Talisman security headers, and brute-force limiters keep your account protected.</p>
+                </div>
+            </div>
+        </div>
+        <!-- Feature 2 -->
+        <div class="col-md-4">
+            <div class="card glass-card border-0 h-100 p-3">
+                <div class="card-body">
+                    <div class="text-primary mb-3">
+                        <i class="bi bi-bar-chart-line fs-2"></i>
+                    </div>
+                    <h3 class="h5 fw-bold font-outfit mb-2">Interactive Visual Analytics</h3>
+                    <p class="text-muted mb-0">Interactive dashboards tracking monthly aggregates, category distributions, daily trends, and linear regression forecasts of your spending rates.</p>
+                </div>
+            </div>
+        </div>
+        <!-- Feature 3 -->
+        <div class="col-md-4">
+            <div class="card glass-card border-0 h-100 p-3">
+                <div class="card-body">
+                    <div class="text-primary mb-3">
+                        <i class="bi bi-cloud-arrow-up fs-2"></i>
+                    </div>
+                    <h3 class="h5 fw-bold font-outfit mb-2">Backup & Restore Center</h3>
+                    <p class="text-muted mb-0">Securely backup your registry with portable JSON v2.0 files. Restores execute multi-point schema integrity checks and encrypt all data under active cryptographic keys.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Developer/CLI Section -->
+    <div class="row align-items-center mt-5 py-5 border-top border-light-subtle">
+        <div class="col-md-6 mb-4 mb-md-0">
+            <h2 class="font-outfit fw-bold mb-3">Built for Developers</h2>
+            <p class="text-muted mb-3">
+                Manage your expenses directly from your terminal using our installable Command Line Interface (CLI) application. It connects securely to the ExpenseWise REST API.
+            </p>
+            <ul class="list-unstyled mb-4">
+                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> Exposes a secure REST API (/api/v1/) with token auth.</li>
+                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> Custom cli-client allows adding, deleting, listing expenses.</li>
+                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> Supports terminal pagination and clean colored data rendering.</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="bg-dark text-light p-4 rounded-3 shadow font-monospace fs-7">
+                <div class="text-secondary"># Install the command line tool</div>
+                <div class="text-primary">$ <span class="text-light">pip install expensewise-cli</span></div>
+                <div class="text-secondary mt-3"># Authenticate client wrapper</div>
+                <div class="text-primary">$ <span class="text-light">expensewise-cli login</span></div>
+                <div class="text-muted">Enter email: user@example.com</div>
+                <div class="text-muted">Enter password: *********</div>
+                <div class="text-success mt-2">Success! Auth token stored locally.</div>
+                <div class="text-secondary mt-3"># Check recent analytics</div>
+                <div class="text-primary">$ <span class="text-light">expensewise-cli analytics</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - ExpenseWise{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="font-outfit fw-bold mb-1"><i class="bi bi-shield-lock-fill text-primary me-2"></i>Administration Portal</h1>
+            <p class="text-muted mb-0">System metrics, user directory controls, and security audit logging</p>
+        </div>
+        <div>
+            <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Navigation Tabs -->
+<ul class="nav nav-pills mb-4 gap-2" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active font-outfit fw-medium px-4 py-2 shadow-sm rounded-pill" id="monitoring-tab" data-bs-toggle="tab" data-bs-target="#monitoring-pane" type="button" role="tab" aria-controls="monitoring-pane" aria-selected="true">
+            <i class="bi bi-cpu me-2"></i>System Monitoring
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link font-outfit fw-medium px-4 py-2 shadow-sm rounded-pill" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-pane" type="button" role="tab" aria-controls="users-pane" aria-selected="false">
+            <i class="bi bi-people me-2"></i>User Management
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link font-outfit fw-medium px-4 py-2 shadow-sm rounded-pill" id="audit-tab" data-bs-toggle="tab" data-bs-target="#audit-pane" type="button" role="tab" aria-controls="audit-pane" aria-selected="false">
+            <i class="bi bi-shield-shaded me-2"></i>Audit Logs
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="adminTabsContent">
+    <!-- Tab 1: System Monitoring -->
+    <div class="tab-pane fade show active" id="monitoring-pane" role="tabpanel" aria-labelledby="monitoring-tab" tabindex="0">
+        <div class="row g-3 mb-4">
+            <!-- Total Users Card -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card glass-card border-0 metric-card bg-white p-3 h-100">
+                    <div class="text-secondary small fw-semibold text-uppercase">Total Registered Users</div>
+                    <div class="stat-value text-primary">{{ metrics.total_users }}</div>
+                    <div class="text-muted small mt-2">
+                        <i class="bi bi-people-fill me-1"></i> Database record count
+                    </div>
+                </div>
+            </div>
+            <!-- Active Users Card -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card glass-card border-0 metric-card success bg-white p-3 h-100">
+                    <div class="text-secondary small fw-semibold text-uppercase">Active Users</div>
+                    <div class="stat-value text-success">{{ metrics.active_users }}</div>
+                    <div class="text-muted small mt-2">
+                        <i class="bi bi-check-circle-fill me-1"></i> Account is enabled
+                    </div>
+                </div>
+            </div>
+            <!-- New Registrations Card -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card glass-card border-0 metric-card info bg-white p-3 h-100">
+                    <div class="text-secondary small fw-semibold text-uppercase">New Regs (30d)</div>
+                    <div class="stat-value text-info">{{ metrics.new_registrations }}</div>
+                    <div class="text-muted small mt-2">
+                        <i class="bi bi-calendar-plus me-1"></i> Registered in last 30 days
+                    </div>
+                </div>
+            </div>
+            <!-- Database Size Card -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card glass-card border-0 metric-card warning bg-white p-3 h-100">
+                    <div class="text-secondary small fw-semibold text-uppercase">Database Storage Footprint</div>
+                    <div class="stat-value text-warning">{{ "{:,.2f}".format(metrics.db_size_mb) }} MB</div>
+                    <div class="text-muted small mt-2">
+                        <i class="bi bi-database-fill me-1"></i> SQLite database file size
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <!-- Login Activity Card -->
+            <div class="col-md-6">
+                <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100">
+                    <h3 class="h6 fw-bold font-outfit mb-3"><i class="bi bi-activity text-primary me-2"></i>Login Statistics</h3>
+                    <div class="d-flex justify-content-around text-center py-3">
+                        <div>
+                            <div class="text-muted small">Successful Logins</div>
+                            <div class="fs-2 fw-bold text-dark">{{ metrics.login_activity }}</div>
+                        </div>
+                        <div class="border-start"></div>
+                        <div>
+                            <div class="text-muted small">Failed Attempts Logged</div>
+                            <div class="fs-2 fw-bold text-danger">{{ metrics.failed_attempts }}</div>
+                        </div>
+                    </div>
+                    <div class="alert alert-secondary small mt-3 mb-0" role="alert">
+                        <i class="bi bi-shield-exclamation me-2"></i>Accounts lock automatically for 15 minutes after 5 consecutive password failures.
+                    </div>
+                </div>
+            </div>
+            <!-- Expense Stats Card -->
+            <div class="col-md-6">
+                <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100">
+                    <h3 class="h6 fw-bold font-outfit mb-3"><i class="bi bi-receipt-cutoff text-primary me-2"></i>Expense Data Summary</h3>
+                    <div class="d-flex justify-content-around text-center py-3">
+                        <div>
+                            <div class="text-muted small">Total Spends Count</div>
+                            <div class="fs-2 fw-bold text-dark">{{ metrics.total_expenses }}</div>
+                        </div>
+                        <div class="border-start"></div>
+                        <div>
+                            <div class="text-muted small">Average Spends / User</div>
+                            <div class="fs-2 fw-bold text-dark">{{ "{:,.1f}".format(metrics.avg_expenses) }}</div>
+                        </div>
+                    </div>
+                    <p class="text-muted small text-center mt-3 mb-0">
+                        <i class="bi bi-lock-fill me-1"></i> Note: Individual expense amounts, categories, and descriptions are encrypted E2E.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 2: User Management -->
+    <div class="tab-pane fade" id="users-pane" role="tabpanel" aria-labelledby="users-tab" tabindex="0">
+        <div class="card glass-card border-0 bg-white p-4 shadow-sm mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                <h3 class="h5 fw-bold font-outfit mb-0">User Directory</h3>
+                <!-- Search Bar -->
+                <form method="GET" action="{{ url_for('dashboard.admin_panel') }}" class="d-flex gap-2" style="max-width: 400px; width: 100%;">
+                    <input type="text" name="search" class="form-control" placeholder="Search name, username, email..." value="{{ search }}">
+                    <button type="submit" class="btn btn-primary px-3">
+                        <i class="bi bi-search"></i>
+                    </button>
+                    {% if search %}
+                    <a href="{{ url_for('dashboard.admin_panel') }}" class="btn btn-outline-secondary d-flex align-items-center">
+                        Clear
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table align-middle table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>User Details</th>
+                            <th>Status</th>
+                            <th>Role</th>
+                            <th>Registration Date</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary-subtle text-primary rounded-circle p-2 me-3 fw-bold font-outfit" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                        {{ user.name[:2].upper() }}
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark">{{ user.name }}</div>
+                                        <div class="text-muted small">@{{ user.username or 'no-username' }}</div>
+                                        <div class="text-secondary small font-monospace">{{ user.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">Active</span>
+                                {% else %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1">Suspended</span>
+                                {% endif %}
+                                
+                                {% if user.lockout_until and user.lockout_until > datetime_now %}
+                                <span class="badge bg-warning text-dark rounded-pill px-2 py-1 small" title="Locked until {{ user.lockout_until }}"><i class="bi bi-lock-fill"></i> Locked</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_super_admin %}
+                                <span class="badge bg-dark text-warning border border-warning rounded-pill px-3 py-1"><i class="bi bi-star-fill me-1"></i>Super Admin</span>
+                                {% elif user.is_admin %}
+                                <span class="badge bg-primary text-white rounded-pill px-3 py-1">Admin</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3 py-1">User</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ user.date_joined.strftime('%b %d, %Y') }}</small>
+                            </td>
+                            <td class="text-end">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <!-- Suspend / Reactivate -->
+                                    {% if user.is_super_admin or user.username == 'ghostrix' %}
+                                        <button class="btn btn-sm btn-outline-secondary" disabled title="Protected Super Admin">
+                                            <i class="bi bi-slash-circle"></i>
+                                        </button>
+                                    {% elif user.is_active %}
+                                        <form method="POST" action="{{ url_for('dashboard.admin_suspend_user', user_id=user.id) }}" onsubmit="return confirm('Suspend user {{ user.name }}? This will block their dashboard and API access.');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Suspend User">
+                                                <i class="bi bi-slash-circle"></i> Suspend
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <form method="POST" action="{{ url_for('dashboard.admin_reactivate_user', user_id=user.id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Reactivate User">
+                                                <i class="bi bi-check-circle"></i> Activate
+                                            </button>
+                                        </form>
+                                    {% endif %}
+
+                                    <!-- Promote / Revoke Admin -->
+                                    {% if user.is_super_admin or user.username == 'ghostrix' %}
+                                        <!-- Protected -->
+                                    {% elif user.is_admin %}
+                                        {% if current_user.is_super_admin %}
+                                            <form method="POST" action="{{ url_for('dashboard.admin_revoke_user', user_id=user.id) }}" onsubmit="return confirm('Revoke Administrator privileges for {{ user.name }}?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Revoke Admin Rights">
+                                                    Demote
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    {% else %}
+                                        <form method="POST" action="{{ url_for('dashboard.admin_promote_user', user_id=user.id) }}" onsubmit="return confirm('Promote {{ user.name }} to Administrator role?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary" title="Promote to Admin">
+                                                Promote
+                                            </button>
+                                        </form>
+                                    {% endif %}
+
+                                    <!-- Delete User -->
+                                    {% if user.is_super_admin or user.username == 'ghostrix' %}
+                                        <button class="btn btn-sm btn-outline-secondary" disabled title="Protected Super Admin">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    {% else %}
+                                        <form method="POST" action="{{ url_for('dashboard.admin_delete_user', user_id=user.id) }}" onsubmit="return confirm('WARNING: Are you absolutely sure you want to permanently delete user {{ user.name }}? This will erase all their expenses and metadata permanently.');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete User Permanently">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="bi bi-people display-6 mb-2 text-secondary"></i>
+                                <p>No matching users found in the directory.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 3: Audit Logs -->
+    <div class="tab-pane fade" id="audit-pane" role="tabpanel" aria-labelledby="audit-tab" tabindex="0">
+        <div class="card glass-card border-0 bg-white p-4 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h5 fw-bold font-outfit mb-0">System Security Audit Logs</h3>
+                <span class="badge bg-secondary-subtle text-dark">Recent 100 Entries</span>
+            </div>
+            <p class="text-muted small">Chronological record of authentication, authorization, database resets, role promotions, and critical database movements.</p>
+
+            <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                <table class="table align-middle table-sm">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Actor</th>
+                            <th>Action</th>
+                            <th>IP Address</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in audit_logs %}
+                        <tr>
+                            <td class="text-nowrap small text-muted">
+                                {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </td>
+                            <td>
+                                {% if log.user %}
+                                    <span class="fw-semibold text-dark">{{ log.user.name }}</span>
+                                    <div class="text-muted small" style="font-size: 0.75rem;">@{{ log.user.username }}</div>
+                                {% else %}
+                                    <span class="text-muted">Anonymous/System</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary text-light font-monospace small" style="font-size: 0.75rem;">{{ log.action }}</span>
+                            </td>
+                            <td class="text-secondary font-monospace small">
+                                {{ log.ip_address or '-' }}
+                            </td>
+                            <td class="small text-dark text-wrap" style="max-width: 350px;">
+                                {{ log.details }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="bi bi-shield-slash display-6 mb-2 text-secondary"></i>
+                                <p>No audit log records found in the database.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Maintain active tab on page refresh
+    document.addEventListener("DOMContentLoaded", function() {
+        // Toggle tab activation if specified in URL query
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTab = urlParams.get('tab');
+        
+        if (activeTab) {
+            const tabButton = document.querySelector(`#${activeTab}-tab`);
+            if (tabButton) {
+                const bootstrapTab = new bootstrap.Tab(tabButton);
+                bootstrapTab.show();
+            }
+        }
+        
+        // Save current active tab in URL query
+        const tabElList = document.querySelectorAll('button[data-bs-toggle="tab"]');
+        tabElList.forEach(tabEl => {
+            tabEl.addEventListener('shown.bs.tab', function(event) {
+                const targetId = event.target.id.replace('-tab', '');
+                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?tab=' + targetId;
+                window.history.pushState({path: newUrl}, '', newUrl);
+            });
+        });
+    });
+</script>
+{% endblock %}

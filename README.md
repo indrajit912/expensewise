@@ -183,11 +183,32 @@ python -m pytest
 `expensewise-cli` is a standalone, terminal-based personal financial assistant that communicates exclusively with the server using the versioned REST API.
 
 ### Installation
-From the root directory of the project, install the CLI in editable mode:
+
+You have three options to install the CLI:
+
+#### Option 1: Direct pip Installation from GitHub (Recommended for End Users)
+Install directly from the GitHub repository without cloning:
 ```bash
-pip install -e cli/
+pip install git+https://github.com/indrajit912/expensewise.git#subdirectory=cli
 ```
-Once installed, the CLI tool is globally available in your environment via the `expensewise-cli` executable.
+
+#### Option 2: Editable Installation from Local Repository (For Development)
+Clone the repository and install in editable mode:
+```bash
+git clone https://github.com/indrajit912/expensewise.git
+cd expensewise/cli
+pip install -e .
+```
+
+#### Option 3: Standard Installation from Local Repository
+Clone and perform a standard pip installation:
+```bash
+git clone https://github.com/indrajit912/expensewise.git
+cd expensewise/cli
+pip install .
+```
+
+Once installed via any method above, the CLI tool is globally available in your environment via the `expensewise-cli` executable.
 
 ### Configuration
 By default, the CLI connects to the local development environment at `http://127.0.0.1:5000/api`. To point the CLI to a remote deployment (e.g. PythonAnywhere production instance), configure the `EXPENSEWISE_API_URL` environment variable:
@@ -313,13 +334,6 @@ expensewise-cli chart --start-date=2026-06-01 --end-date=2026-06-30
   Utilities    | ██████████                      | ₹2,000.00 (16.3%)
   Other        | ████                            | ₹800.00 (6.5%)
 ```
-
-### Troubleshooting
-* **Error: 'expensewise-cli' is not recognized as an internal or external command:**
-  Make sure you ran `pip install -e cli/` inside your active virtual environment and the environment's `Scripts/` (or `bin/`) folder is present in your system PATH.
-* **Vault Decryption Errors:**
-  If you recently changed your password, make sure to execute `expensewise-cli login` again to force update the local credential derivations and unlock database decryption.
-```,StartLine:181,TargetContent:
 
 ---
 

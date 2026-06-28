@@ -10,10 +10,11 @@ setup(
         'click>=8.0.0',
         'requests>=2.25.0',
         'rich>=13.0.0',
+        'keyring>=24.0.0',
     ],
     entry_points={
         'console_scripts': [
-            'expense-cli=cli.main:cli',
+            'expensewise-cli=cli.main:cli',
         ],
     },
 )

@@ -42,6 +42,22 @@ class EncryptionService:
         return f.decrypt(encrypted_fernet_key.encode()).decode()
 
     @staticmethod
+    def get_server_master_key() -> bytes:
+        """Derives a stable 32-byte Fernet key from SECRET_KEY or MASTER_ENCRYPTION_KEY."""
+        from flask import has_app_context
+        key_src = None
+        if has_app_context():
+            key_src = current_app.config.get('MASTER_ENCRYPTION_KEY') or current_app.config.get('SECRET_KEY')
+        if not key_src:
+            key_src = os.environ.get('MASTER_ENCRYPTION_KEY') or os.environ.get('SECRET_KEY')
+        if not key_src:
+            # Default fallback for testing/dev environments if not initialized in env
+            key_src = "expensewise-fallback-default-secret-key-for-local-dev-and-testing-purposes"
+        import hashlib
+        key_hash = hashlib.sha256(key_src.encode() if isinstance(key_src, str) else key_src).digest()
+        return base64.urlsafe_b64encode(key_hash)
+
+    @staticmethod
     def set_override_key(key: str):
         """Sets a thread-global override key. Useful for CLI commands and test fixtures."""
         _local_data.override_key = key
@@ -61,12 +77,36 @@ class EncryptionService:
                 if val:
                     return val
 
+                # Recover key if cache expired but token/user is still authenticated
+                user = getattr(g, 'current_user', None)
+                if user and getattr(user, 'server_encrypted_fernet_key', None):
+                    try:
+                        server_derived = EncryptionService.get_server_master_key()
+                        decrypted_key = EncryptionService.decrypt_fernet_key(user.server_encrypted_fernet_key, server_derived)
+                        if decrypted_key:
+                            EncryptionService.store_user_key(user.id, decrypted_key, token=g.current_token.token)
+                            return decrypted_key
+                    except Exception:
+                        pass
+
             # Fallback to session memory (for browser navigation)
             try:
                 val = session.get('user_fernet_key')
                 if val:
                     return val
-            except (RuntimeError, KeyError):
+
+                # Recover key if session expired/restarted but browser user is still authenticated
+                from flask_login import current_user
+                if current_user and current_user.is_authenticated and getattr(current_user, 'server_encrypted_fernet_key', None):
+                    try:
+                        server_derived = EncryptionService.get_server_master_key()
+                        decrypted_key = EncryptionService.decrypt_fernet_key(current_user.server_encrypted_fernet_key, server_derived)
+                        if decrypted_key:
+                            EncryptionService.store_user_key(current_user.id, decrypted_key)
+                            return decrypted_key
+                    except Exception:
+                        pass
+            except (RuntimeError, KeyError, AttributeError):
                 pass
 
         return None

@@ -47,7 +47,7 @@ class RegisterForm(FlaskForm):
         ('JPY', 'JPY (¥)'),
         ('AUD', 'AUD (A$)'),
         ('CAD', 'CAD (C$)')
-    ], validators=[DataRequired()], default='USD')
+    ], validators=[DataRequired()], default='INR')
     submit = SubmitField('Create Account')
 
     def validate_email(self, field):

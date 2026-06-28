@@ -1,11 +1,10 @@
 import io
-import csv
 import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
 class ExportService:
-    """Service to handle CSV and JSON export pipelines."""
+    """Service to handle JSON export pipelines."""
 
     @staticmethod
     def generate_json(user):
@@ -72,31 +71,3 @@ class ExportService:
         }
         
         return json.dumps(data, indent=4)
-
-    @staticmethod
-    def generate_csv(expenses):
-        """Writes expense records into an in-memory CSV buffer."""
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        # Write CSV Headers
-        writer.writerow([
-            'Amount', 'Category', 'Payee', 'Payment Mode', 'Date', 'Description', 
-            'Original Amount', 'Original Currency', 'Conversion Rate', 'Converted Amount'
-        ])
-        
-        for e in expenses:
-            writer.writerow([
-                float(e.amount),
-                e.category,
-                e.payee or '',
-                e.payment_mode or '',
-                e.expense_date.strftime('%Y-%m-%d'),
-                e.description or '',
-                float(e.original_amount) if e.original_amount else float(e.amount),
-                e.original_currency,
-                float(e.conversion_rate) if e.conversion_rate else 1.0,
-                float(e.converted_amount) if e.converted_amount else float(e.amount)
-            ])
-            
-        return output.getvalue()

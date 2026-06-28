@@ -46,10 +46,15 @@
                             <i class="bi bi-pie-chart me-1"></i> Analytics
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'dashboard.budget' %}active{% endif %}" href="{{ url_for('dashboard.budget') }}">
+                            <i class="bi bi-wallet2 me-1"></i> Budgeting
+                        </a>
+                    </li>
                     {% if current_user.is_admin %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}" href="{{ url_for('dashboard.admin_panel') }}">
-                            <i class="bi bi-shield-lock me-1"></i> Admin Dashboard
+                            <i class="bi bi-shield-lock me-1"></i> Admin
                         </a>
                     </li>
                     {% endif %}
@@ -64,7 +69,8 @@
                     {% if current_user.is_authenticated %}
                     <div class="dropdown">
                         <button class="btn btn-outline-light dropdown-toggle d-flex align-items-center" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-person-circle me-2"></i> {{ current_user.username }}
+                            <img src="{{ current_user.avatar_url(32) }}" alt="{{ current_user.username }}" class="rounded-circle me-2" width="28" height="28" style="object-fit: cover; border: 1px solid rgba(255,255,255,0.2);">
+                            {{ current_user.username }}
                         </button>
                         <ul class="dropdown-menu dropdown-menu-start dropdown-menu-lg-end shadow border-0" aria-labelledby="userDropdown">
                             <li><span class="dropdown-header text-muted">User: {{ current_user.email }}</span></li>
@@ -115,7 +121,7 @@
     <!-- Footer -->
     <footer class="footer bg-dark text-light py-4 mt-auto border-top border-secondary">
         <div class="container text-center">
-            <p class="mb-1">&copy; 2026 <span class="font-outfit fw-semibold text-primary">ExpenseWise</span>. All rights reserved.</p>
+            <p class="mb-1">&copy; {{ current_year }} <span class="font-outfit fw-semibold text-primary">ExpenseWise</span>. All rights reserved.</p>
             <small class="text-secondary d-block mb-1">
                 Developed & Maintained by 
                 <a href="https://indrajitghosh.onrender.com" target="_blank" class="text-primary text-decoration-none fw-semibold">Indrajit Ghosh</a> 

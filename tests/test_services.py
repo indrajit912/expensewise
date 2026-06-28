@@ -81,15 +81,64 @@ def test_export_service(app, test_user):
         json_out = ExportService.generate_json(test_user)
         data = json.loads(json_out)
         assert data['export_version'] == '2.0'
-        assert data['user_preferences']['default_currency'] == 'USD'
+        assert data['user_preferences']['default_currency'] == test_user.default_currency
         assert len(data['expenses']) == 1
         assert data['expenses'][0]['amount'] == 45.0
         assert data['expenses'][0]['payee'] == 'Uber'
+
+
+
+def test_gravatar_url_generation(app, test_user):
+    """Tests that avatar_url produces correct Gravatar URLs."""
+    with app.app_context():
+        url = test_user.avatar_url(size=40, default='mp')
+        assert "gravatar.com/avatar/" in url
+        assert "s=40" in url
+        assert "d=mp" in url
         
-        # Test CSV Generation
-        csv_out = ExportService.generate_csv([exp])
-        lines = csv_out.strip().split('\n')
-        assert len(lines) == 2 # Header + 1 record row
-        assert 'Amount' in lines[0]
-        assert '45.0' in lines[1]
-        assert 'Uber' in lines[1]
+        import hashlib
+        expected_hash = hashlib.md5("test@example.com".encode('utf-8')).hexdigest()
+        assert expected_hash in url
+
+
+def test_currency_format_indian_numbering(app):
+    """Tests the Jinja currency_format filter with Indian digit groupings."""
+    with app.app_context():
+        cf_filter = app.jinja_env.filters['currency_format']
+        
+        # Test basic, thousand, lakh, and crore formats
+        assert cf_filter(100, 'INR') == '₹100.00'
+        assert cf_filter(1230.50, 'INR') == '₹1,230.50'
+        assert cf_filter(1230445.75, 'INR') == '₹12,30,445.75'
+        assert cf_filter(12345678.90, 'USD') == '$1,23,45,678.90'
+        
+        assert cf_filter(0, 'INR') == '₹0.00'
+        assert cf_filter(-1230445.75, 'INR') == '₹-12,30,445.75'
+        assert cf_filter(None, 'INR') == ''
+
+
+def test_decimal_small_filter(app):
+    """Tests the Jinja decimal_small filter wrapping decimal parts."""
+    with app.app_context():
+        ds_filter = app.jinja_env.filters['decimal_small']
+        
+        # Test positive numbers, currency strings, and edge cases
+        assert ds_filter("₹1,230.50") == "₹1,230<span style='font-size: 0.75em;'>.50</span>"
+        assert ds_filter("₹12,30,445.75") == "₹12,30,445<span style='font-size: 0.75em;'>.75</span>"
+        assert ds_filter("100.00") == "100<span style='font-size: 0.75em;'>.00</span>"
+        assert ds_filter("100") == "100"
+        assert ds_filter("") == ""
+        assert ds_filter(None) == ""
+
+
+def test_current_year_context_processor(app):
+    """Tests that current_year is injected and equals the active calendar year."""
+    from datetime import datetime
+    with app.app_context():
+        processors = app.template_context_processors[None]
+        context = {}
+        for p in processors:
+            context.update(p())
+            
+        assert 'current_year' in context
+        assert context['current_year'] == datetime.now().year

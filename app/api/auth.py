@@ -168,6 +168,14 @@ def api_login():
         try:
             derived_key = EncryptionService.derive_key(password, user.kdf_salt)
             fernet_key = EncryptionService.decrypt_fernet_key(user.encrypted_fernet_key, derived_key)
+            
+            # Lazy migration for existing users
+            if not user.server_encrypted_fernet_key:
+                try:
+                    server_derived = EncryptionService.get_server_master_key()
+                    user.server_encrypted_fernet_key = EncryptionService.encrypt_fernet_key(fernet_key, server_derived)
+                except Exception:
+                    pass
         except Exception as e:
             return jsonify({'error': 'Server Error', 'message': 'Failed to unlock secure vault.'}), 500
 
@@ -230,6 +238,63 @@ def api_logout():
         AuditService.log("Logout", "Successful API logout", user_id=user_id)
         
         return jsonify({'message': 'Logged out successfully. Token invalidated.'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Server Error', 'message': str(e)}), 500
+
+
+@api.route('/v1/auth/me', methods=['GET'])
+@token_required
+def api_me():
+    """Retrieve details of the currently authenticated user."""
+    user = g.current_user
+    return jsonify({
+        'id': user.id,
+        'name': user.name,
+        'username': user.username,
+        'email': user.email,
+        'default_currency': user.default_currency,
+        'is_active': user.is_active,
+        'is_admin': user.is_admin,
+        'created_at': user.date_joined.isoformat()
+    }), 200
+
+
+@api.route('/v1/auth/change-password', methods=['POST'])
+@token_required
+def api_change_password():
+    """Updates user's password securely, ensuring KDF values and secure keys remain in sync."""
+    data = request.get_json() or {}
+    current_pw = data.get('current_password', '')
+    new_pw = data.get('new_password', '')
+    
+    if not current_pw or not new_pw:
+        return jsonify({'error': 'Bad Request', 'message': 'Both current_password and new_password fields are required.'}), 400
+        
+    user = g.current_user
+    if not user.check_password(current_pw):
+        return jsonify({'error': 'Unauthorized', 'message': 'Incorrect current password.'}), 401
+        
+    if len(new_pw) < 8:
+        return jsonify({'error': 'Bad Request', 'message': 'New password must be at least 8 characters long.'}), 400
+    if not any(c.isupper() for c in new_pw):
+        return jsonify({'error': 'Bad Request', 'message': 'Password must contain at least one uppercase letter.'}), 400
+    if not any(c.islower() for c in new_pw):
+        return jsonify({'error': 'Bad Request', 'message': 'Password must contain at least one lowercase letter.'}), 400
+    if not any(c.isdigit() for c in new_pw):
+        return jsonify({'error': 'Bad Request', 'message': 'Password must contain at least one number.'}), 400
+        
+    import re
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", new_pw):
+        return jsonify({'error': 'Bad Request', 'message': 'Password must contain at least one special character.'}), 400
+        
+    try:
+        user.set_password(new_pw)
+        db.session.commit()
+        
+        # Log audit
+        AuditService.log("Password Change", "Successfully changed password via API settings", user_id=user.id)
+        return jsonify({'message': 'Your password has been changed successfully.'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Server Error', 'message': str(e)}), 500

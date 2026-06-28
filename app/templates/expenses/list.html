@@ -72,7 +72,7 @@
     <div class="col-sm-6 col-lg-3">
         <div class="card glass-card border-0 bg-white p-3 h-100 shadow-sm border-start border-primary border-4">
             <div class="text-secondary small fw-semibold text-uppercase text-truncate">Total Spent (Filtered)</div>
-            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ total_spending | currency_format(current_user.default_currency) }}</div>
+            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ total_spending | currency_format(current_user.default_currency) | decimal_small }}</div>
             <div class="text-muted small mt-2 text-truncate">
                 <i class="bi bi-receipt me-1"></i> Across {{ num_expenses }} transactions
             </div>
@@ -83,7 +83,7 @@
     <div class="col-sm-6 col-lg-3">
         <div class="card glass-card border-0 bg-white p-3 h-100 shadow-sm border-start border-info border-4">
             <div class="text-secondary small fw-semibold text-uppercase text-truncate">Average Transaction</div>
-            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ avg_expense | currency_format(current_user.default_currency) }}</div>
+            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ avg_expense | currency_format(current_user.default_currency) | decimal_small }}</div>
             <div class="text-muted small mt-2 text-truncate">
                 <i class="bi bi-calculator me-1"></i> Average spent per ledger item
             </div>
@@ -94,7 +94,7 @@
     <div class="col-sm-6 col-lg-3">
         <div class="card glass-card border-0 bg-white p-3 h-100 shadow-sm border-start border-success border-4">
             <div class="text-secondary small fw-semibold text-uppercase text-truncate">Average Daily Spending</div>
-            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ avg_daily | currency_format(current_user.default_currency) }}</div>
+            <div class="stat-value font-outfit fw-bold text-dark fs-3 mt-1">{{ avg_daily | currency_format(current_user.default_currency) | decimal_small }}</div>
             <div class="text-muted small mt-2 text-truncate">
                 <i class="bi bi-calendar-day me-1 text-success"></i> Wk: {{ avg_weekly | currency_format(current_user.default_currency) }} | Mo: {{ avg_monthly | currency_format(current_user.default_currency) }}
             </div>
@@ -107,14 +107,14 @@
             <div class="text-secondary small fw-semibold text-uppercase text-truncate">Extremes (Single)</div>
             <div class="stat-value font-outfit fw-semibold text-dark fs-5 mt-1 text-truncate">
                 {% if highest_expense %}
-                    Max: {{ highest_expense.amount | currency_format(current_user.default_currency) }}
+                    Max: {{ highest_expense.amount | currency_format(current_user.default_currency) | decimal_small }}
                 {% else %}
                     Max: -
                 {% endif %}
             </div>
-            <div class="text-muted small text-truncate">
+            <div class="stat-value font-outfit fw-semibold text-dark fs-5 mt-1 text-truncate">
                 {% if lowest_expense %}
-                    Min: {{ lowest_expense.amount | currency_format(current_user.default_currency) }}
+                    Min: {{ lowest_expense.amount | currency_format(current_user.default_currency) | decimal_small }}
                 {% else %}
                     Min: -
                 {% endif %}
@@ -492,13 +492,32 @@ document.addEventListener('DOMContentLoaded', () => {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== undefined) {
+                                label += formatIndianNumber(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     grid: { color: '#f1f5f9' },
-                    ticks: { color: '#64748b' }
+                    ticks: {
+                        color: '#64748b',
+                        callback: function(value) {
+                            return formatIndianNumber(value);
+                        }
+                    }
                 },
                 x: {
                     grid: { display: false },
@@ -533,6 +552,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 legend: {
                     position: 'bottom',
                     labels: { boxWidth: 10, padding: 6, font: { family: 'Inter', size: 10 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed !== undefined) {
+                                label += formatIndianNumber(context.parsed);
+                            }
+                            return label;
+                        }
+                    }
                 }
             },
             cutout: '65%'
@@ -565,6 +598,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 legend: {
                     position: 'bottom',
                     labels: { boxWidth: 10, padding: 6, font: { family: 'Inter', size: 10 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed !== undefined) {
+                                label += formatIndianNumber(context.parsed);
+                            }
+                            return label;
+                        }
+                    }
                 }
             },
             cutout: '65%'

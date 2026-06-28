@@ -136,6 +136,11 @@
                             {% else %}
                                 {{ form.category(class="form-select") }}
                             {% endif %}
+                            <div class="mt-1">
+                                <a href="{{ url_for('dashboard.settings', next=request.path) }}#custom-categories-section" class="add-new-link text-primary small text-decoration-none fw-semibold">
+                                    <i class="bi bi-plus-circle me-1"></i>+ Add New Category
+                                </a>
+                            </div>
                         </div>
 
                         <!-- Payment Mode -->
@@ -151,6 +156,11 @@
                             {% else %}
                                 {{ form.payment_mode(class="form-select") }}
                             {% endif %}
+                            <div class="mt-1">
+                                <a href="{{ url_for('dashboard.settings', next=request.path) }}#payment-channels-section" class="add-new-link text-primary small text-decoration-none fw-semibold">
+                                    <i class="bi bi-plus-circle me-1"></i>+ Add New Payment Method
+                                </a>
+                            </div>
                         </div>
                     </div>
 
@@ -271,6 +281,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnConfirmConversion = document.getElementById('btn-confirm-conversion');
     const form = currencySelect.closest('form');
     
+    // Form state preservation using sessionStorage
+    const savedData = sessionStorage.getItem('temp_expense_form');
+    if (savedData) {
+        try {
+            const data = JSON.parse(savedData);
+            for (const key in data) {
+                const input = form.querySelector(`[name="${key}"]`);
+                if (input) {
+                    input.value = data[key];
+                    // Trigger input or change events to update conversion section / UI
+                    input.dispatchEvent(new Event('change'));
+                    input.dispatchEvent(new Event('input'));
+                }
+            }
+        } catch (e) {
+            console.error('Failed to restore form data:', e);
+        }
+        sessionStorage.removeItem('temp_expense_form');
+    }
+
+    document.querySelectorAll('.add-new-link').forEach(link => {
+        link.addEventListener('click', function() {
+            const formData = {};
+            const inputs = form.querySelectorAll('input, select, textarea');
+            inputs.forEach(input => {
+                if (input.name && input.value) {
+                    formData[input.name] = input.value;
+                }
+            });
+            sessionStorage.setItem('temp_expense_form', JSON.stringify(formData));
+        });
+    });
+    
     let conversionConfirmed = false;
 
     function updateCurrencyUI() {
@@ -298,18 +341,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const amount = parseFloat(amountInput.value) || 0.00;
         const rate = parseFloat(conversionRateInput.value) || 1.00;
         
-        previewOriginalAmount.textContent = amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        previewOriginalAmount.textContent = formatIndianNumber(amount);
         previewRate.textContent = rate.toFixed(4);
-        previewConvertedAmount.textContent = (amount * rate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        previewConvertedAmount.textContent = formatIndianNumber(amount * rate);
     }
 
     function updateModalPreview() {
         const amount = parseFloat(amountInput.value) || 0.00;
         const rate = parseFloat(modalRateInput.value) || 0.00;
         
-        modalOriginalVal.textContent = amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        modalOriginalVal.textContent = formatIndianNumber(amount);
         modalRateVal.textContent = rate.toFixed(4);
-        modalConvertedVal.textContent = (amount * rate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        modalConvertedVal.textContent = formatIndianNumber(amount * rate);
     }
 
     currencySelect.addEventListener('change', updateCurrencyUI);

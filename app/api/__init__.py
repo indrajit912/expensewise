@@ -4,4 +4,4 @@ from flask import Blueprint
 api = Blueprint('api', __name__)
 
 # Import individual endpoints to trigger route definitions
-from app.api import auth, expenses, analytics, categories
+from app.api import auth, expenses, analytics, categories, budget

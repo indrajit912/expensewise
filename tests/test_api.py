@@ -230,3 +230,57 @@ def test_api_categories_and_payment_methods_crud(client, app, test_user, api_hea
     # 10. Delete 'Bitcoin' (no expenses associated)
     pm_del_btc = client.delete(f'/api/v1/payment-methods/{crypto_id}', headers=api_headers)
     assert pm_del_btc.status_code == 200
+
+
+def test_api_profile_me(client, test_user, api_headers):
+    """Tests fetching current user details via GET /api/v1/auth/me."""
+    res = client.get('/api/v1/auth/me', headers=api_headers)
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['email'] == test_user.email
+    assert data['username'] == test_user.username
+    assert 'id' in data
+
+
+def test_api_change_password(client, app, test_user, api_headers):
+    """Tests password updating through the API."""
+    res = client.post('/api/v1/auth/change-password', json={
+        'current_password': 'Password123!',
+        'new_password': 'NewPassword123!'
+    }, headers=api_headers)
+    assert res.status_code == 200
+    assert b'changed successfully' in res.data
+
+    # Verify that we can log in with the new password
+    login_res = client.post('/api/v1/auth/login', json={
+        'email': test_user.email,
+        'password': 'NewPassword123!'
+    })
+    assert login_res.status_code == 200
+
+
+def test_api_budget_management(client, app, test_user, api_headers):
+    """Tests budget CRUD operations via API."""
+    # 1. Fetch suggestions and budget comparison list
+    res = client.get('/api/v1/budget?month=2026-07', headers=api_headers)
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['month'] == '2026-07'
+    assert 'categories' in data
+
+    # 2. Save budget limits
+    save_res = client.post('/api/v1/budget', json={
+        'month': '2026-07',
+        'budgets': {
+            'Food': 4000.00,
+            'Shopping': 2500.00
+        }
+    }, headers=api_headers)
+    assert save_res.status_code == 200
+
+    # 3. Assert databases are updated
+    with app.app_context():
+        from app.models.expense import Budget
+        b_food = Budget.query.filter_by(user_id=test_user.id, month='2026-07', category_name='Food').first()
+        assert b_food is not None
+        assert float(b_food.amount) == 4000.00

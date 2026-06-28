@@ -26,7 +26,7 @@
     <div class="col-sm-6 col-lg-3">
         <div class="card glass-card border-0 metric-card bg-white p-3 h-100">
             <div class="text-secondary small fw-semibold text-uppercase">Spent (Last 30 Days)</div>
-            <div class="stat-value">{{ metrics.total_spending | currency_format(current_user.default_currency) }}</div>
+            <div class="stat-value">{{ metrics.total_spending | currency_format(current_user.default_currency) | decimal_small }}</div>
             <div class="text-muted small mt-2">
                 <i class="bi bi-calendar-event me-1"></i> Rolling 30-day period
             </div>
@@ -37,7 +37,7 @@
     <div class="col-sm-6 col-lg-3">
         <div class="card glass-card border-0 metric-card info bg-white p-3 h-100">
             <div class="text-secondary small fw-semibold text-uppercase">Daily Average</div>
-            <div class="stat-value">{{ metrics.daily_average | currency_format(current_user.default_currency) }}</div>
+            <div class="stat-value">{{ metrics.daily_average | currency_format(current_user.default_currency) | decimal_small }}</div>
             <div class="text-muted small mt-2">
                 <i class="bi bi-calculator me-1"></i> Total / 30 days
             </div>
@@ -64,7 +64,7 @@
         <div class="card glass-card border-0 metric-card {% if diff <= 0 %}success{% else %}danger{% endif %} bg-white p-3 h-100">
             <div class="text-secondary small fw-semibold text-uppercase">Vs. Previous Month</div>
             <div class="stat-value {% if diff <= 0 %}text-success{% else %}text-danger{% endif %}">
-                {% if diff <= 0 %}-{% else %}+{% endif %}{{ (diff | abs) | currency_format(current_user.default_currency) }}
+                {% if diff <= 0 %}-{% else %}+{% endif %}{{ (diff | abs) | currency_format(current_user.default_currency) | decimal_small }}
             </div>
             <div class="small mt-2 {% if diff <= 0 %}text-success{% else %}text-danger{% endif %}">
                 <i class="bi {% if diff <= 0 %}bi-arrow-down-short{% else %}bi-arrow-up-short{% endif %} fs-6"></i>
@@ -242,13 +242,32 @@ document.addEventListener('DOMContentLoaded', () => {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== undefined) {
+                                label += formatIndianNumber(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     grid: { color: '#f1f5f9' },
-                    ticks: { color: '#64748b' }
+                    ticks: {
+                        color: '#64748b',
+                        callback: function(value) {
+                            return formatIndianNumber(value);
+                        }
+                    }
                 },
                 x: {
                     grid: { display: false },
@@ -287,6 +306,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 legend: {
                     position: 'bottom',
                     labels: { boxWidth: 12, padding: 8, font: { family: 'Inter', size: 11 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed !== undefined) {
+                                label += formatIndianNumber(context.parsed);
+                            }
+                            return label;
+                        }
+                    }
                 }
             },
             cutout: '65%'

@@ -88,3 +88,134 @@ def test_user_logout(client, test_user):
     response = client.get('/auth/logout', follow_redirects=True)
     assert response.status_code == 200
     assert b'You have been logged out successfully.' in response.data
+
+
+def test_password_reset_preserves_encrypted_data(client, app, test_user):
+    """Verifies that resetting password does not invalidate encrypted expense data."""
+    from app.services.encryption_service import EncryptionService
+    from app.models.expense import Expense
+    from decimal import Decimal
+    from datetime import date
+    
+    # 1. Log in and add an expense (so it's encrypted with original key)
+    client.post('/auth/login', data={
+        'email': 'test@example.com',
+        'password': 'Password123!'
+    })
+    
+    # Add an expense via app context
+    with app.app_context():
+        derived = EncryptionService.derive_key("Password123!", test_user.kdf_salt)
+        fernet_key = EncryptionService.decrypt_fernet_key(test_user.encrypted_fernet_key, derived)
+        EncryptionService.set_override_key(fernet_key)
+        
+        expense = Expense(
+            user_id=test_user.id,
+            amount=Decimal('42.00'),
+            category='Food',
+            expense_date=date(2026, 6, 28),
+            description='Secret Lunch'
+        )
+        db.session.add(expense)
+        db.session.commit()
+        expense_id = expense.id
+        
+        EncryptionService.clear_user_key()
+
+    # 2. Logout the user
+    client.get('/auth/logout')
+    
+    # 3. Simulate Forgot Password reset flow
+    client.post(f'/auth/reset_password/{test_user.id}', data={
+        'password': 'NewPassword123!',
+        'confirm_password': 'NewPassword123!'
+    })
+    
+    # 4. Log back in with the NEW password
+    login_res = client.post('/auth/login', data={
+        'email': 'test@example.com',
+        'password': 'NewPassword123!'
+    }, follow_redirects=True)
+    assert login_res.status_code == 200
+    assert b'Welcome back' in login_res.data
+    
+    # 5. Access the data directly to verify it decrypts successfully
+    with app.app_context():
+        user_reloaded = User.query.get(test_user.id)
+        new_derived = EncryptionService.derive_key("NewPassword123!", user_reloaded.kdf_salt)
+        new_fernet_key = EncryptionService.decrypt_fernet_key(user_reloaded.encrypted_fernet_key, new_derived)
+        EncryptionService.set_override_key(new_fernet_key)
+        
+        exp_reloaded = Expense.query.get(expense_id)
+        assert exp_reloaded.category == 'Food'
+        assert float(exp_reloaded.amount) == 42.00
+        assert exp_reloaded.description == 'Secret Lunch'
+        
+        EncryptionService.clear_user_key()
+
+
+def test_change_password_preserves_encrypted_data(client, app, test_user):
+    """Verifies that changing password from settings preserves encrypted expense data."""
+    from app.services.encryption_service import EncryptionService
+    from app.models.expense import Expense
+    from decimal import Decimal
+    from datetime import date
+    
+    # 1. Log in
+    client.post('/auth/login', data={
+        'email': 'test@example.com',
+        'password': 'Password123!'
+    })
+    
+    # Add an expense via app context
+    with app.app_context():
+        derived = EncryptionService.derive_key("Password123!", test_user.kdf_salt)
+        fernet_key = EncryptionService.decrypt_fernet_key(test_user.encrypted_fernet_key, derived)
+        EncryptionService.set_override_key(fernet_key)
+        
+        expense = Expense(
+            user_id=test_user.id,
+            amount=Decimal('88.50'),
+            category='Utilities',
+            expense_date=date(2026, 6, 28),
+            description='Electricity Bill'
+        )
+        db.session.add(expense)
+        db.session.commit()
+        expense_id = expense.id
+        
+        EncryptionService.clear_user_key()
+        
+    # 2. Change password from settings
+    settings_res = client.post('/settings', data={
+        'action': 'change_password',
+        'current_password': 'Password123!',
+        'new_password': 'NewPassword123!',
+        'confirm_password': 'NewPassword123!'
+    }, follow_redirects=True)
+    assert settings_res.status_code == 200
+    assert b'changed successfully' in settings_res.data
+    
+    # 3. Logout
+    client.get('/auth/logout')
+    
+    # 4. Log in with the new password
+    login_res = client.post('/auth/login', data={
+        'email': 'test@example.com',
+        'password': 'NewPassword123!'
+    }, follow_redirects=True)
+    assert login_res.status_code == 200
+    
+    # 5. Verify the expense still decrypts correctly
+    with app.app_context():
+        user_reloaded = User.query.get(test_user.id)
+        new_derived = EncryptionService.derive_key("NewPassword123!", user_reloaded.kdf_salt)
+        new_fernet_key = EncryptionService.decrypt_fernet_key(user_reloaded.encrypted_fernet_key, new_derived)
+        EncryptionService.set_override_key(new_fernet_key)
+        
+        exp_reloaded = Expense.query.get(expense_id)
+        assert exp_reloaded.category == 'Utilities'
+        assert float(exp_reloaded.amount) == 88.50
+        assert exp_reloaded.description == 'Electricity Bill'
+        
+        EncryptionService.clear_user_key()

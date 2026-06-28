@@ -77,53 +77,13 @@ def test_expense_list_filters_and_sorting(client, app, test_user):
 
 
 def test_expenses_web_exports(client, test_user):
-    """Tests the csv/json web download routes."""
+    """Tests the json web download routes."""
     client.post('/auth/login', data={'email': 'test@example.com', 'password': 'Password123!'})
     
-    # Export CSV
-    csv_res = client.get('/expenses/export?format=csv')
-    assert csv_res.status_code == 200
-    assert csv_res.mimetype == 'text/csv'
-    
     # Export JSON
-    json_res = client.get('/expenses/export?format=json')
+    json_res = client.get('/expenses/export')
     assert json_res.status_code == 200
     assert json_res.mimetype == 'application/json'
-
-
-def test_csv_upload_and_preview_flow(client, app, test_user):
-    """Tests the staged file upload preview and staging confirm actions."""
-    login_res = client.post('/auth/login', data={'email': 'test@example.com', 'password': 'Password123!'}, follow_redirects=True)
-    assert b'Welcome back, Test User!' in login_res.data
-    
-    # Ensure GET /expenses/import is accessible
-    get_res = client.get('/expenses/import')
-    assert get_res.status_code == 200
-    
-    # Perform real CSV file upload post
-    data = {
-        'backup_file': (io.BytesIO(b"Amount,Category,Date,Description\n15.50,Food,2026-06-20,Burgers\n"), 'test.csv')
-    }
-    response = client.post('/expenses/import', data=data, follow_redirects=True)
-    
-    assert response.status_code == 200
-    assert b'CSV Staging Preview' in response.data
-    assert b'Burgers' in response.data
-    
-    # Confirm staging load (POST confirm)
-    confirm_res = client.post('/expenses/import/preview', data={'action': 'confirm'}, follow_redirects=True)
-    assert confirm_res.status_code == 200
-    assert b'Import completed successfully!' in confirm_res.data
-    
-    with app.app_context():
-        expenses = Expense.query.filter_by(user_id=test_user.id).all()
-        exp = None
-        for e in expenses:
-            if e.category == 'Food':
-                exp = e
-                break
-        assert exp is not None
-        assert float(exp.amount) == 15.50
 
 
 def test_analytics_route(client, test_user):
@@ -245,3 +205,86 @@ def test_json_v2_upload_invalid_preview(client, test_user):
     # Try to force confirm POST request
     confirm_res = client.post('/expenses/import/preview', data={'action': 'confirm'}, follow_redirects=True)
     assert b'Import failed: Validation error' in confirm_res.data
+
+
+def test_settings_next_redirect(client, test_user):
+    """Tests that adding category/payment method with next query param redirects to next URL."""
+    # Login user
+    client.post('/auth/login', data={
+        'email': 'test@example.com',
+        'password': 'Password123!'
+    })
+    
+    # 1. Test add_category redirects to next param
+    res_cat = client.post('/settings?next=/expenses/add', data={
+        'action': 'add_category',
+        'name': 'Subscription',
+        'color': '#ff0000'
+    })
+    # Since we did not use follow_redirects=True, it should return 302 to the next parameter url
+    assert res_cat.status_code == 302
+    assert res_cat.headers['Location'].endswith('/expenses/add')
+    
+    # 2. Test add_payment_method redirects to next param
+    res_pm = client.post('/settings?next=/expenses/add', data={
+        'action': 'add_payment_method',
+        'name': 'GPay',
+        'color': '#00ff00'
+    })
+    assert res_pm.status_code == 302
+    assert res_pm.headers['Location'].endswith('/expenses/add')
+
+
+def test_budget_planning_route(client, test_user, app):
+    """Tests the /budget route and budget planning flows."""
+    # 1. Unauthenticated redirect to login
+    res = client.get('/budget')
+    assert res.status_code == 302
+    assert 'login' in res.headers['Location']
+    
+    # Login user
+    client.post('/auth/login', data={
+        'email': 'test@example.com',
+        'password': 'Password123!'
+    })
+    
+    # 2. Authenticated GET request renders planning view
+    res = client.get('/budget?month=2026-07')
+    assert res.status_code == 200
+    assert b'Budget Planning' in res.data
+    assert b'2026-07' in res.data
+    
+    # 3. Post to save budget
+    res = client.post('/budget?month=2026-07', data={
+        'budget_Food': '5000.00',
+        'budget_Shopping': '2500.00'
+    }, follow_redirects=True)
+    assert res.status_code == 200
+    assert b'saved successfully' in res.data
+    
+    # 4. Assert budgets are written to database
+    with app.app_context():
+        from app.models.expense import Budget
+        b_food = Budget.query.filter_by(user_id=test_user.id, month='2026-07', category_name='Food').first()
+        b_shop = Budget.query.filter_by(user_id=test_user.id, month='2026-07', category_name='Shopping').first()
+        
+        assert b_food is not None
+        assert float(b_food.amount) == 5000.00
+        
+        assert b_shop is not None
+        assert float(b_shop.amount) == 2500.00
+        
+    # 5. Overwrite budget amount
+    res = client.post('/budget?month=2026-07', data={
+        'budget_Food': '6000.00',
+        'budget_Shopping': '' # Cleared should delete it
+    }, follow_redirects=True)
+    
+    with app.app_context():
+        from app.models.expense import Budget
+        b_food = Budget.query.filter_by(user_id=test_user.id, month='2026-07', category_name='Food').first()
+        b_shop = Budget.query.filter_by(user_id=test_user.id, month='2026-07', category_name='Shopping').first()
+        
+        assert b_food is not None
+        assert float(b_food.amount) == 6000.00
+        assert b_shop is None  # Check that clearing deletes the entry

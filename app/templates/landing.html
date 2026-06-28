@@ -4,45 +4,55 @@
 
 {% block content %}
 <div class="my-5">
-    <!-- Hero Header -->
-    <div class="hero-section text-light text-center p-5 mb-5 shadow-lg">
-        <div class="row justify-content-center py-4">
-            <div class="col-lg-8">
-                <i class="bi bi-wallet2 text-primary display-2 mb-3"></i>
+    <!-- Premium Hero Section with Modern Background Gradient -->
+    <div class="hero-section text-light text-center p-5 mb-5 rounded-4 position-relative overflow-hidden" 
+         style="background: linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #4f46e5 100%); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);">
+        
+        <!-- Decorative Glow Elements -->
+        <div class="position-absolute rounded-circle" style="top: -10%; left: -10%; width: 300px; height: 300px; background: rgba(79, 70, 229, 0.3); filter: blur(80px); pointer-events: none;"></div>
+        <div class="position-absolute rounded-circle" style="bottom: -10%; right: -10%; width: 300px; height: 300px; background: rgba(236, 72, 153, 0.2); filter: blur(80px); pointer-events: none;"></div>
+
+        <div class="row justify-content-center py-4 position-relative" style="z-index: 2;">
+            <div class="col-lg-9">
+                <i class="bi bi-wallet2 text-primary display-2 mb-3 d-inline-block animate-pulse" style="animation: pulse 3s infinite;"></i>
+                
                 <div class="mb-3">
-                    <span class="badge bg-secondary-subtle text-primary border border-primary-subtle px-3 py-2 font-monospace">
-                        Created by <a href="https://indrajitghosh.onrender.com" target="_blank" class="text-primary text-decoration-none fw-semibold">Indrajit Ghosh</a> (IIT Kanpur)
+                    <span class="badge bg-white bg-opacity-10 text-primary border border-primary-subtle px-3 py-2 font-monospace" style="backdrop-filter: blur(5px);">
+                        Developed & Maintained by <a href="https://indrajitghosh.onrender.com" target="_blank" class="text-primary text-decoration-none fw-bold">Indrajit Ghosh</a>
                     </span>
                 </div>
+                
                 <h1 class="display-4 fw-extrabold font-outfit tracking-tight mb-3">
-                    Master Your Money with <span class="text-primary">ExpenseWise</span>
+                    Take Control of Your Money with <span class="text-primary text-gradient" style="background: linear-gradient(to right, #60a5fa, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">ExpenseWise</span>
                 </h1>
-                <p class="lead text-secondary fs-4 mb-4">
-                    A secure, production-grade personal expense manager featuring real-time insights, interactive charts, legacy CLI migrations, and developer APIs.
+                
+                <p class="lead text-secondary-emphasis fs-5 mb-4 px-md-5" style="color: #cbd5e1 !important;">
+                    A secure, production-grade personal expense manager featuring real-time insights, interactive analytical charts, dynamic monthly budgeting, and robust developer APIs.
                 </p>
-                <div class="d-flex justify-content-center gap-3 mb-4">
-                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg px-4 py-3 shadow">
-                        <i class="bi bi-rocket-takeoff me-2"></i> Get Started Free
+                
+                <div class="d-flex flex-wrap justify-content-center gap-3 mb-5">
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg px-4 py-3 shadow-lg d-flex align-items-center" style="border-radius: 8px;">
+                        <i class="bi bi-rocket-takeoff-fill me-2"></i> Get Started Free
                     </a>
-                    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-light btn-lg px-4 py-3">
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-light btn-lg px-4 py-3 d-flex align-items-center" style="border-radius: 8px;">
                         <i class="bi bi-box-arrow-in-right me-2"></i> Access Account
                     </a>
                 </div>
 
-                <!-- Guest Demo Account Credentials Banner -->
-                <div class="card bg-white bg-opacity-10 border border-white border-opacity-10 rounded-3 p-3 text-start mx-auto shadow-sm" style="max-width: 500px; backdrop-filter: blur(10px);">
+                <!-- Guest Demo Account Banner -->
+                <div class="card bg-white bg-opacity-5 border border-white border-opacity-10 rounded-3 p-3 text-start mx-auto shadow-sm" style="max-width: 520px; backdrop-filter: blur(10px);">
                     <div class="d-flex align-items-center mb-2">
-                        <span class="badge bg-success-subtle text-success border border-success-subtle me-2 px-2 py-1 font-monospace fw-bold">DEMO MODE</span>
-                        <span class="text-secondary small">Explore the application instantly without registration:</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle me-2 px-2 py-1 font-monospace fw-bold">GUEST ACCESS</span>
+                        <span class="text-secondary small" style="color: #94a3b8 !important;">Try the application instantly using demo credentials:</span>
                     </div>
-                    <div class="row g-2 text-light small">
+                    <div class="row g-2 text-light small font-monospace">
                         <div class="col-sm-6 d-flex align-items-center">
-                            <span class="text-secondary me-2">Username:</span>
-                            <code class="text-info bg-dark bg-opacity-50 px-2 py-1 rounded border border-secondary border-opacity-50">guest</code>
+                            <span class="text-muted me-2">Username:</span>
+                            <code class="text-info bg-dark bg-opacity-40 px-2 py-1 rounded border border-secondary border-opacity-25">guest</code>
                         </div>
                         <div class="col-sm-6 d-flex align-items-center">
-                            <span class="text-secondary me-2">Password:</span>
-                            <code class="text-info bg-dark bg-opacity-50 px-2 py-1 rounded border border-secondary border-opacity-50">password</code>
+                            <span class="text-muted me-2">Password:</span>
+                            <code class="text-info bg-dark bg-opacity-40 px-2 py-1 rounded border border-secondary border-opacity-25">password</code>
                         </div>
                     </div>
                 </div>
@@ -50,72 +60,236 @@
         </div>
     </div>
 
-    <!-- Feature Grid -->
-    <div class="row g-4 mt-4">
-        <!-- Feature 1 -->
-        <div class="col-md-4">
-            <div class="card glass-card border-0 h-100 p-3">
+    <!-- Key Core Capabilities Section -->
+    <div class="text-center mb-4">
+        <h2 class="font-outfit fw-bold mb-2">Key Application Features</h2>
+        <p class="text-muted">Explore the core capabilities of ExpenseWise designed for personal and professional tracking.</p>
+    </div>
+
+    <div class="row g-4 mb-5">
+        <!-- Feature 1: Expense Tracking -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card glass-card border-0 h-100 p-3 shadow-sm hover-translate-y">
                 <div class="card-body">
                     <div class="text-primary mb-3">
-                        <i class="bi bi-shield-check fs-2"></i>
+                        <i class="bi bi-receipt-cutoff fs-2"></i>
                     </div>
-                    <h3 class="h5 fw-bold font-outfit mb-2">Secure Multi-User Auth</h3>
-                    <p class="text-muted mb-0">Every user's budget database is sandboxed. Hashed password keys, Talisman security headers, and brute-force limiters keep your account protected.</p>
+                    <h3 class="h5 fw-bold font-outfit mb-2 text-dark">Expense Tracking</h3>
+                    <p class="text-muted small mb-0">Quickly record details of daily transactions. Support for multiple currencies, conversion rates, and automatic calculations preserves historical record accuracy.</p>
                 </div>
             </div>
         </div>
-        <!-- Feature 2 -->
-        <div class="col-md-4">
-            <div class="card glass-card border-0 h-100 p-3">
+
+        <!-- Feature 2: Dashboard & Analytics -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card glass-card border-0 h-100 p-3 shadow-sm hover-translate-y">
                 <div class="card-body">
                     <div class="text-primary mb-3">
-                        <i class="bi bi-bar-chart-line fs-2"></i>
+                        <i class="bi bi-bar-chart-line-fill fs-2"></i>
                     </div>
-                    <h3 class="h5 fw-bold font-outfit mb-2">Interactive Visual Analytics</h3>
-                    <p class="text-muted mb-0">Interactive dashboards tracking monthly aggregates, category distributions, daily trends, and linear regression forecasts of your spending rates.</p>
+                    <h3 class="h5 fw-bold font-outfit mb-2 text-dark">Dashboard & Analytics</h3>
+                    <p class="text-muted small mb-0">Visualize spending patterns with interactive trend lines and doughnut allocation charts. View forecast spending rates built via linear regressions.</p>
                 </div>
             </div>
         </div>
-        <!-- Feature 3 -->
-        <div class="col-md-4">
-            <div class="card glass-card border-0 h-100 p-3">
+
+        <!-- Feature 3: Reports & Insights -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card glass-card border-0 h-100 p-3 shadow-sm hover-translate-y">
                 <div class="card-body">
                     <div class="text-primary mb-3">
-                        <i class="bi bi-cloud-arrow-up fs-2"></i>
+                        <i class="bi bi-lightbulb-fill fs-2"></i>
                     </div>
-                    <h3 class="h5 fw-bold font-outfit mb-2">Backup & Restore Center</h3>
-                    <p class="text-muted mb-0">Securely backup your registry with portable JSON v2.0 files. Restores execute multi-point schema integrity checks and encrypt all data under active cryptographic keys.</p>
+                    <h3 class="h5 fw-bold font-outfit mb-2 text-dark">Reports & Insights</h3>
+                    <p class="text-muted small mb-0">Receive automated comparative reports outlining week-over-week and month-over-month variances, highest spending days, and category deviations.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 4: Budget Planning (Highlighting New Feature) -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-primary border-opacity-25 bg-primary-subtle bg-opacity-10 h-100 p-3 shadow-sm hover-translate-y">
+                <div class="card-body">
+                    <div class="text-primary mb-3 position-relative d-inline-block">
+                        <i class="bi bi-wallet2 fs-2"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem; padding: 0.25em 0.4em;">NEW</span>
+                    </div>
+                    <h3 class="h5 fw-bold font-outfit mb-2 text-dark d-flex align-items-center">
+                        Budget Planning
+                    </h3>
+                    <p class="text-muted small mb-0">Generate suggested budgets based on 3-month spending averages. Customize category limits, set constraints, and review allowance tracking in real-time.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 5: Category & Payment Management -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card glass-card border-0 h-100 p-3 shadow-sm hover-translate-y">
+                <div class="card-body">
+                    <div class="text-primary mb-3">
+                        <i class="bi bi-tags-fill fs-2"></i>
+                    </div>
+                    <h3 class="h5 fw-bold font-outfit mb-2 text-dark">Category & Payment Modes</h3>
+                    <p class="text-muted small mb-0">Personalize structures. Add custom categories and payment channels with associated palette themes to integrate smoothly into form fields.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 6: Security & Cryptography -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card glass-card border-0 h-100 p-3 shadow-sm hover-translate-y">
+                <div class="card-body">
+                    <div class="text-primary mb-3">
+                        <i class="bi bi-shield-lock-fill fs-2"></i>
+                    </div>
+                    <h3 class="h5 fw-bold font-outfit mb-2 text-dark">Multi-User Security</h3>
+                    <p class="text-muted small mb-0">Every database partition is sandboxed. Password hashing, AES encryption for local details, Talisman security headers, and CSRF protection keep your data safe.</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Developer/CLI Section -->
-    <div class="row align-items-center mt-5 py-5 border-top border-light-subtle">
+    <!-- NEW FEATURE: Deep Dive into Budget Planning -->
+    <div class="row align-items-center py-5 my-5 border-top border-bottom border-light-subtle bg-light bg-opacity-30 rounded-4 px-3 px-md-5">
+        <div class="col-lg-6 mb-4 mb-lg-0">
+            <span class="badge bg-primary text-white mb-2 px-3 py-2 text-uppercase font-outfit fw-semibold" style="font-size: 0.75rem;">Budget Planning Feature</span>
+            <h2 class="font-outfit fw-bold text-dark mb-3">Plan Next Month's Budget with Intelligent Suggestions</h2>
+            <p class="text-secondary mb-3">
+                No more guessing limits. ExpenseWise analyzes your historic category patterns over the preceding 3 months to generate optimal spending recommendations.
+            </p>
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-calculator-fill text-primary me-2 mt-1"></i>
+                        <div>
+                            <h5 class="h6 fw-bold mb-1">Average-Based Targets</h5>
+                            <p class="text-muted small mb-0">Uses dynamic, weighted rolling average computations per category.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-sliders text-primary me-2 mt-1"></i>
+                        <div>
+                            <h5 class="h6 fw-bold mb-1">Fully Customizable</h5>
+                            <p class="text-muted small mb-0">Accept suggestions or modify individual values manually.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-bar-chart-fill text-primary me-2 mt-1"></i>
+                        <div>
+                            <h5 class="h6 fw-bold mb-1">Allowance Meters</h5>
+                            <p class="text-muted small mb-0">Track real-time actual spending vs budget limits with progress indicators.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-calendar3 text-primary me-2 mt-1"></i>
+                        <div>
+                            <h5 class="h6 fw-bold mb-1">Month-on-Month Isolation</h5>
+                            <p class="text-muted small mb-0">Configure future budgets without breaking past expense history limits.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <!-- Simulated Mockup of Budget Planning Dashboard -->
+            <div class="card border-0 shadow-lg p-4 bg-white rounded-3">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                    <span class="fw-bold font-outfit text-dark"><i class="bi bi-wallet2 text-primary me-2"></i>Allowance Tracker (Jul 2026)</span>
+                    <span class="badge bg-success-subtle text-success">Healthy Budget</span>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-semibold text-secondary">Food & Dining</span>
+                        <span class="small fw-bold">₹4,500 <span class="text-muted">/ ₹6,000</span></span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar rounded" role="progressbar" style="width: 75%; background-color: #4f46e5;" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-semibold text-secondary">Shopping</span>
+                        <span class="small fw-bold">₹2,800 <span class="text-muted">/ ₹3,000</span></span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar rounded" role="progressbar" style="width: 93%; background-color: #f59e0b;" aria-valuenow="93" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-semibold text-secondary">Utilities</span>
+                        <span class="small fw-bold">₹5,200 <span class="text-muted text-danger">/ ₹5,000</span></span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar rounded bg-danger" role="progressbar" style="width: 100%;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="text-danger small mt-1" style="font-size: 0.7rem;"><i class="bi bi-exclamation-circle-fill"></i> Over limit by ₹200.00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Developer/CLI & JSON Section -->
+    <div class="row align-items-center py-5 border-top border-light-subtle">
         <div class="col-md-6 mb-4 mb-md-0">
-            <h2 class="font-outfit fw-bold mb-3">Built for Developers</h2>
+            <span class="badge bg-primary text-white mb-2 px-3 py-2 text-uppercase font-outfit fw-semibold" style="font-size: 0.75rem;">Standalone Terminal Client</span>
+            <h2 class="font-outfit fw-bold mb-3">Meet the ExpenseWise CLI</h2>
             <p class="text-muted mb-3">
-                Manage your expenses directly from your terminal using our installable Command Line Interface (CLI) application. It connects securely to the ExpenseWise REST API.
+                For developers, sysadmins, and keyboard-centric users, <code>expensewise-cli</code> is a standalone terminal client that handles registration, secure logins, transaction ledger listings, custom color categories, and budgeting comparisons—communicating <strong>exclusively via the versioned REST API</strong>.
             </p>
             <ul class="list-unstyled mb-4">
-                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> Exposes a secure REST API (/api/v1/) with token auth.</li>
-                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> Custom cli-client allows adding, deleting, listing expenses.</li>
-                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> Supports terminal pagination and clean colored data rendering.</li>
+                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> <strong>Secure API Auth</strong>: Authenticate using API Tokens generated directly from settings.</li>
+                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> <strong>Terminal Analytics & Charts</strong>: Generate beautiful, colorful Unicode bar charts mapping your spending category rollups.</li>
+                <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> <strong>Dynamic Budgeting</strong>: Compare budgets vs actual spending, retrieve averages, and update targets straight from your shell.</li>
             </ul>
+            <div class="d-flex gap-2">
+                <a href="#cli-setup-details" class="btn btn-primary btn-sm px-3 py-2" onclick="document.getElementById('cli-setup-details').scrollIntoView({behavior: 'smooth'})">Get Started with CLI</a>
+                <a href="{{ url_for('dashboard.settings') }}#api-integrations-section" class="btn btn-outline-secondary btn-sm px-3 py-2">Get API Token</a>
+            </div>
         </div>
-        <div class="col-md-6">
-            <div class="bg-dark text-light p-4 rounded-3 shadow font-monospace fs-7">
-                <div class="text-secondary"># Install the command line tool</div>
-                <div class="text-primary">$ <span class="text-light">pip install expensewise-cli</span></div>
-                <div class="text-secondary mt-3"># Authenticate client wrapper</div>
-                <div class="text-primary">$ <span class="text-light">expensewise-cli login</span></div>
-                <div class="text-muted">Enter email: user@example.com</div>
-                <div class="text-muted">Enter password: *********</div>
-                <div class="text-success mt-2">Success! Auth token stored locally.</div>
-                <div class="text-secondary mt-3"># Check recent analytics</div>
-                <div class="text-primary">$ <span class="text-light">expensewise-cli analytics</span></div>
+        <div class="col-md-6" id="cli-setup-details">
+            <div class="bg-dark text-light p-4 rounded-3 shadow font-monospace fs-7 border border-secondary border-opacity-25" style="box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;">
+                <div class="text-secondary"># Clone from GitHub</div>
+                <div class="text-primary">$ <span class="text-light">git clone https://github.com/indrajit912/expensewise.git</span></div>
+                
+                <div class="text-secondary mt-3"># Install CLI from source</div>
+                <div class="text-primary">$ <span class="text-light">cd expensewise/cli && pip install -e .</span></div>
+                
+                <div class="text-secondary mt-3"># Authenticate using your web API token</div>
+                <div class="text-primary">$ <span class="text-light">expensewise-cli token-login &lt;your_api_token&gt;</span></div>
+                
+                <div class="text-secondary mt-3"># Show current month's budget allowance tracker</div>
+                <div class="text-primary">$ <span class="text-light">expensewise-cli budget-show</span></div>
+                
+                <div class="text-secondary mt-3"># Generate colorful category spending chart</div>
+                <div class="text-primary">$ <span class="text-light">expensewise-cli chart</span></div>
+                
+                <div class="text-secondary mt-3"># List all expenses with pagination</div>
+                <div class="text-primary">$ <span class="text-light">expensewise-cli list</span></div>
+                
+                <div class="mt-3 pt-2 border-top border-secondary border-opacity-25">
+                    <a href="https://github.com/indrajit912/expensewise" target="_blank" class="text-decoration-none text-info">
+                        <i class="bi bi-github"></i> View on GitHub
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .hover-translate-y {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .hover-translate-y:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08) !important;
+    }
+</style>
 {% endblock %}

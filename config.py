@@ -4,6 +4,37 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
+
+def init_env_secrets():
+    env_path = BASE_DIR / '.env'
+    example_path = BASE_DIR / '.env.example'
+    if not env_path.exists() and example_path.exists():
+        import shutil
+        shutil.copy(example_path, env_path)
+        
+    if env_path.exists():
+        content = env_path.read_text()
+        modified = False
+        lines = content.splitlines()
+        for i, line in enumerate(lines):
+            if line.startswith('SECRET_KEY='):
+                val = line.split('=', 1)[1].strip()
+                if not val and not os.environ.get('SECRET_KEY'):
+                    new_key = secrets.token_hex(32)
+                    lines[i] = f'SECRET_KEY={new_key}'
+                    os.environ['SECRET_KEY'] = new_key
+                    modified = True
+            elif line.startswith('SECURITY_PASSWORD_SALT='):
+                val = line.split('=', 1)[1].strip()
+                if not val and not os.environ.get('SECURITY_PASSWORD_SALT'):
+                    new_salt = secrets.token_hex(16)
+                    lines[i] = f'SECURITY_PASSWORD_SALT={new_salt}'
+                    os.environ['SECURITY_PASSWORD_SALT'] = new_salt
+                    modified = True
+        if modified:
+            env_path.write_text('\n'.join(lines) + '\n')
+
+init_env_secrets()
 load_dotenv(BASE_DIR / '.env')
 
 class Config:

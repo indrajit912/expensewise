@@ -1,7 +1,6 @@
 import os
 import uuid
 import json
-import pandas as pd
 from decimal import Decimal
 from datetime import datetime, date
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, Response, session
@@ -592,7 +591,7 @@ def delete_expense(uuid_str):
 @expenses.route('/import', methods=['GET', 'POST'])
 @login_required
 def import_backup():
-    """Handles bank CSV and JSON backup file uploads, preparing a staging file."""
+    """Handles JSON backup file uploads, preparing a staging file."""
     if request.method == 'POST':
         if 'backup_file' not in request.files:
             flash('No file part in the request', 'danger')
@@ -603,9 +602,8 @@ def import_backup():
             flash('No file selected.', 'danger')
             return redirect(request.url)
             
-        if file and (file.filename.endswith('.csv') or file.filename.endswith('.json')):
-            ext = 'csv' if file.filename.endswith('.csv') else 'json'
-            filename = f"backup_{current_user.id}_{uuid.uuid4().hex}.{ext}"
+        if file and file.filename.endswith('.json'):
+            filename = f"backup_{current_user.id}_{uuid.uuid4().hex}.json"
             upload_folder = os.path.join(current_app.instance_path, 'uploads')
             os.makedirs(upload_folder, exist_ok=True)
             file_path = os.path.join(upload_folder, filename)
@@ -613,10 +611,10 @@ def import_backup():
             
             # Save configuration parameters to session for preview
             session['import_file'] = file_path
-            session['import_file_type'] = ext
+            session['import_file_type'] = 'json'
             return redirect(url_for('expenses.preview_import'))
         else:
-            flash('Invalid file format. Please upload either a standard JSON or CSV file.', 'danger')
+            flash('Invalid file format. Please upload a standard JSON backup file.', 'danger')
             
     return render_template('expenses/import_backup.html')
 
@@ -626,7 +624,6 @@ def import_backup():
 def preview_import():
     """Generates preview statistics of the uploaded backup file before committing changes."""
     file_path = session.get('import_file')
-    file_type = session.get('import_file_type', 'csv')
     
     if not file_path or not os.path.exists(file_path):
         flash('No file uploaded or session expired. Please upload again.', 'warning')
@@ -637,53 +634,46 @@ def preview_import():
     error_msg = None
 
     try:
-        if file_type == 'json':
-            # Load JSON content
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+        # Load JSON content
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        headers = ['Amount', 'Category', 'Payee', 'Payment Mode', 'Date', 'Description']
+        preview_rows = []
+        
+        if isinstance(data, dict):
+            # v2.0 backup JSON
+            is_valid, checklist, error_msg = ImportService.validate_backup_json(data)
             
-            headers = ['Amount', 'Category', 'Payee', 'Payment Mode', 'Date', 'Description']
-            preview_rows = []
+            cat_map = {c['id']: c['name'] for c in data.get('categories', [])}
+            pm_map = {pm['id']: pm['name'] for pm in data.get('payment_methods', [])}
             
-            if isinstance(data, dict):
-                # v2.0 backup JSON
-                is_valid, checklist, error_msg = ImportService.validate_backup_json(data)
-                
-                cat_map = {c['id']: c['name'] for c in data.get('categories', [])}
-                pm_map = {pm['id']: pm['name'] for pm in data.get('payment_methods', [])}
-                
-                for r in data.get('expenses', [])[:8]:
-                    preview_rows.append({
-                        'Amount': r.get('amount'),
-                        'Category': cat_map.get(r.get('category_id'), 'Other'),
-                        'Payee': r.get('payee') or '-',
-                        'Payment Mode': pm_map.get(r.get('payment_method_id')) if r.get('payment_method_id') else '-',
-                        'Date': r.get('expense_date'),
-                        'Description': r.get('description') or '-'
-                    })
-                total_rows = len(data.get('expenses', []))
-            elif isinstance(data, list):
-                # legacy list JSON
-                for r in data[:8]:
-                    preview_rows.append({
-                        'Amount': r.get('amount'),
-                        'Category': r.get('category') or r.get('category_id') or 'Other',
-                        'Payee': r.get('payee') or '-',
-                        'Payment Mode': r.get('payment_mode') or r.get('payment_method_id') or '-',
-                        'Date': r.get('expense_date') or r.get('date'),
-                        'Description': r.get('description') or '-'
-                    })
-                total_rows = len(data)
-            else:
-                is_valid = False
-                total_rows = 0
-                error_msg = "Invalid JSON structure. Root element must be an object or a list."
+            for r in data.get('expenses', [])[:8]:
+                preview_rows.append({
+                    'Amount': r.get('amount'),
+                    'Category': cat_map.get(r.get('category_id'), 'Other'),
+                    'Payee': r.get('payee') or '-',
+                    'Payment Mode': pm_map.get(r.get('payment_method_id')) if r.get('payment_method_id') else '-',
+                    'Date': r.get('expense_date'),
+                    'Description': r.get('description') or '-'
+                })
+            total_rows = len(data.get('expenses', []))
+        elif isinstance(data, list):
+            # legacy list JSON
+            for r in data[:8]:
+                preview_rows.append({
+                    'Amount': r.get('amount'),
+                    'Category': r.get('category') or r.get('category_id') or 'Other',
+                    'Payee': r.get('payee') or '-',
+                    'Payment Mode': r.get('payment_mode') or r.get('payment_method_id') or '-',
+                    'Date': r.get('expense_date') or r.get('date'),
+                    'Description': r.get('description') or '-'
+                })
+            total_rows = len(data)
         else:
-            # Parse CSV content
-            df = pd.read_csv(file_path)
-            headers = [col.strip() for col in df.columns]
-            preview_rows = df.head(8).to_dict(orient='records')
-            total_rows = len(df)
+            is_valid = False
+            total_rows = 0
+            error_msg = "Invalid JSON structure. Root element must be an object or a list."
             
     except Exception as e:
         flash(f"Error reading staging file: {str(e)}", 'danger')
@@ -698,24 +688,20 @@ def preview_import():
         
         if action == 'confirm':
             # Block confirm if validation failed
-            if file_type == 'json':
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        chk_data = json.load(f)
-                    if isinstance(chk_data, dict):
-                        is_valid_chk, _, error_msg_chk = ImportService.validate_backup_json(chk_data)
-                        if not is_valid_chk:
-                            flash(f"Import failed: Validation error: {error_msg_chk}", 'danger')
-                            return redirect(url_for('expenses.import_backup'))
-                except Exception as e:
-                    flash(f"Import failed: Invalid file: {str(e)}", 'danger')
-                    return redirect(url_for('expenses.import_backup'))
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    chk_data = json.load(f)
+                if isinstance(chk_data, dict):
+                    is_valid_chk, _, error_msg_chk = ImportService.validate_backup_json(chk_data)
+                    if not is_valid_chk:
+                        flash(f"Import failed: Validation error: {error_msg_chk}", 'danger')
+                        return redirect(url_for('expenses.import_backup'))
+            except Exception as e:
+                flash(f"Import failed: Invalid file: {str(e)}", 'danger')
+                return redirect(url_for('expenses.import_backup'))
 
             # Perform import
-            if file_type == 'json':
-                result = ImportService.import_standard_json(current_user.id, file_path)
-            else:
-                result = ImportService.import_csv(current_user.id, file_path)
+            result = ImportService.import_standard_json(current_user.id, file_path)
                 
             os.remove(file_path)
             session.pop('import_file', None)
@@ -725,7 +711,7 @@ def preview_import():
                 # Audit log entry
                 AuditService.log(
                     "Import", 
-                    f"User imported data via {file_type.upper()}: Added {result['success_count']} expenses, skipped {result['duplicate_count']} duplicates, errors {result['error_count']}"
+                    f"User imported data via JSON: Added {result['success_count']} expenses, skipped {result['duplicate_count']} duplicates, errors {result['error_count']}"
                 )
                 
                 flash(
@@ -756,7 +742,7 @@ def preview_import():
         is_valid=is_valid,
         checklist=checklist,
         error_msg=error_msg,
-        file_type=file_type
+        file_type='json'
     )
 
 
@@ -764,27 +750,17 @@ def preview_import():
 @login_required
 def export_expenses():
     """Generates file attachments to export current user's expenses (records in audit logs)."""
-    fmt = request.args.get('format', 'json').lower()
-    
     # Grab all user expenses
     expenses_list = Expense.query.filter_by(user_id=current_user.id).all()
     # Sort in memory
     expenses_list.sort(key=lambda x: x.expense_date or date.min, reverse=True)
     
     # Audit log entry
-    AuditService.log("Export", f"User exported account data in {fmt.upper()} format")
+    AuditService.log("Export", "User exported account data in JSON format")
         
-    if fmt == 'json':
-        json_data = ExportService.generate_json(current_user)
-        return Response(
-            json_data,
-            mimetype='application/json',
-            headers={'Content-Disposition': 'attachment;filename=expenses_export.json'}
-        )
-    else:
-        csv_data = ExportService.generate_csv(expenses_list)
-        return Response(
-            csv_data,
-            mimetype='text/csv',
-            headers={'Content-Disposition': 'attachment;filename=expenses_export.csv'}
-        )
+    json_data = ExportService.generate_json(current_user)
+    return Response(
+        json_data,
+        mimetype='application/json',
+        headers={'Content-Disposition': 'attachment;filename=expenses_export.json'}
+    )

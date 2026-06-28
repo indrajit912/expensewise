@@ -20,10 +20,11 @@ class User(db.Model, UserMixin):
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=False, nullable=False) # Defaults to False for registration verification
     is_email_verified = db.Column(db.Boolean, default=False, nullable=False)
-    default_currency = db.Column(db.String(10), nullable=False, default='USD')
+    default_currency = db.Column(db.String(10), nullable=False, default='INR')
     
     # End-to-End Encryption Columns
     encrypted_fernet_key = db.Column(db.Text, nullable=False)
+    server_encrypted_fernet_key = db.Column(db.Text, nullable=True)
     kdf_salt = db.Column(db.LargeBinary, nullable=False)
 
     # Administrator Roles
@@ -52,6 +53,14 @@ class User(db.Model, UserMixin):
             derived = EncryptionService.derive_key(dummy_password, self.kdf_salt)
             fernet_key = EncryptionService.generate_fernet_key()
             self.encrypted_fernet_key = EncryptionService.encrypt_fernet_key(fernet_key, derived)
+            
+            # Seed server-encrypted copy
+            try:
+                server_derived = EncryptionService.get_server_master_key()
+                self.server_encrypted_fernet_key = EncryptionService.encrypt_fernet_key(fernet_key, server_derived)
+            except Exception:
+                pass
+                
             # Temporarily cache to thread memory for test suites/seeding
             if not EncryptionService.get_user_key():
                 EncryptionService.set_override_key(fernet_key)
@@ -62,14 +71,31 @@ class User(db.Model, UserMixin):
         
         self.password_hash = generate_password_hash(password)
         
-        # Load active Fernet key or generate a fresh one
+        # Load active Fernet key or generate/recover one
         decrypted_key = EncryptionService.get_user_key()
         if not decrypted_key:
-            decrypted_key = EncryptionService.generate_fernet_key()
-            EncryptionService.set_override_key(decrypted_key)
+            # Attempt to recover via server-encrypted key if available
+            if self.server_encrypted_fernet_key:
+                try:
+                    server_derived = EncryptionService.get_server_master_key()
+                    decrypted_key = EncryptionService.decrypt_fernet_key(self.server_encrypted_fernet_key, server_derived)
+                    EncryptionService.set_override_key(decrypted_key)
+                except Exception:
+                    pass
+            
+            if not decrypted_key:
+                decrypted_key = EncryptionService.generate_fernet_key()
+                EncryptionService.set_override_key(decrypted_key)
             
         derived_key = EncryptionService.derive_key(password, self.kdf_salt)
         self.encrypted_fernet_key = EncryptionService.encrypt_fernet_key(decrypted_key, derived_key)
+        
+        # Keep server-encrypted key in sync
+        try:
+            server_derived = EncryptionService.get_server_master_key()
+            self.server_encrypted_fernet_key = EncryptionService.encrypt_fernet_key(decrypted_key, server_derived)
+        except Exception:
+            pass
 
     def check_password(self, password):
         """Verifies password hashes."""
@@ -81,22 +107,35 @@ class User(db.Model, UserMixin):
         
         category_colors = {
             'Food': '#f97316',
+            'Snacks': '#fbbf24',
             'Groceries': '#10b981',
-            'Rent': '#6366f1',
-            'Utilities': '#06b6d4',
-            'Travel': '#3b82f6',
-            'Entertainment': '#ec4899',
-            'Medical': '#ef4444',
-            'Education': '#8b5cf6',
             'Shopping': '#f43f5e',
-            'Other': '#64748b'
+            'Travel': '#3b82f6',
+            'Health': '#ef4444',
+            'Essentials': '#8b5cf6',
+            'Bills': '#6366f1',
+            'Emergency': '#dc2626',
+            'Others': '#64748b',
+            'Toiletries': '#06b6d4',
+            'Grooming': '#ec4899',
+            'Study': '#7c3aed',
+            'Trip': '#2563eb',
+            'Chill': '#a855f7',
+            'Gift': '#f472b6',
+            'Kitchen': '#b45309',
+            'Home Essentials': '#059669',
+            'Rent': '#7c3aed',
+            'Utilities': '#2563eb'
         }
         payment_colors = {
             'Cash': '#16a34a',
-            'Phonepe': '#0ea5e9',
+            'Paytm': '#1e40af',
+            'Phonepe': '#0369a1',
+            'Google Pay': '#ea580c',
+            'BHIM': '#0d9488',
             'Card': '#2563eb',
-            'NetBanking': '#0f766e',
-            'Other': '#475569'
+            'Net Banking': '#0f766e',
+            'NetBanking': '#0f766e'
         }
         
         for cat_name, cat_color in category_colors.items():
@@ -144,6 +183,13 @@ class User(db.Model, UserMixin):
         if self.is_super_admin and hasattr(self, 'is_super_admin') and self.is_super_admin and not value:
             raise ValueError("Super administrator status cannot be revoked.")
         return value
+
+    def avatar_url(self, size=32, default='identicon') -> str:
+        """Generates a Gravatar URL for the user's email address."""
+        import hashlib
+        email_clean = self.email.strip().lower().encode('utf-8')
+        email_hash = hashlib.md5(email_clean).hexdigest()
+        return f"https://www.gravatar.com/avatar/{email_hash}?s={size}&d={default}"
 
     def __repr__(self):
         return f"<User {self.email}>"

@@ -176,13 +176,32 @@ document.addEventListener('DOMContentLoaded', () => {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== undefined) {
+                                label += formatIndianNumber(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     grid: { color: '#f1f5f9' },
-                    ticks: { color: '#64748b' }
+                    ticks: {
+                        color: '#64748b',
+                        callback: function(value) {
+                            return formatIndianNumber(value);
+                        }
+                    }
                 },
                 x: {
                     grid: { display: false },
@@ -222,6 +241,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 legend: {
                     position: 'right',
                     labels: { boxWidth: 12, padding: 8, font: { family: 'Inter', size: 11 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed !== undefined) {
+                                label += formatIndianNumber(context.parsed);
+                            }
+                            return label;
+                        }
+                    }
                 }
             },
             cutout: '65%'

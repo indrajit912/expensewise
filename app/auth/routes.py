@@ -198,6 +198,14 @@ def login():
                     derived_key = EncryptionService.derive_key(form.password.data, user.kdf_salt)
                     fernet_key = EncryptionService.decrypt_fernet_key(user.encrypted_fernet_key, derived_key)
                     EncryptionService.store_user_key(user.id, fernet_key)
+                    
+                    # Lazy migration for existing users
+                    if not user.server_encrypted_fernet_key:
+                        try:
+                            server_derived = EncryptionService.get_server_master_key()
+                            user.server_encrypted_fernet_key = EncryptionService.encrypt_fernet_key(fernet_key, server_derived)
+                        except Exception as migration_err:
+                            current_app.logger.error("Lazy migration failed for %s: %s", user.email, str(migration_err))
                 except Exception as e:
                     current_app.logger.error("Failed to decrypt Fernet key for user %s: %s", user.email, str(e))
                     flash('Failed to unlock database vault. Check password integrity.', 'danger')

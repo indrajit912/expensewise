@@ -90,8 +90,43 @@ def settings():
     if request.method == 'POST':
         action = request.form.get('action')
         
+        # Password Change Action
+        if action == 'change_password':
+            current_pw = request.form.get('current_password', '')
+            new_pw = request.form.get('new_password', '')
+            confirm_pw = request.form.get('confirm_password', '')
+            
+            # Validation
+            if not current_pw or not new_pw or not confirm_pw:
+                flash("All password fields are required.", "danger")
+            elif not current_user.check_password(current_pw):
+                flash("Incorrect current password.", "danger")
+            elif new_pw != confirm_pw:
+                flash("New passwords do not match.", "danger")
+            elif len(new_pw) < 8:
+                flash("New password must be at least 8 characters long.", "danger")
+            elif not any(c.isupper() for c in new_pw):
+                flash('Password must contain at least one uppercase letter.', 'danger')
+            elif not any(c.islower() for c in new_pw):
+                flash('Password must contain at least one lowercase letter.', 'danger')
+            elif not any(c.isdigit() for c in new_pw):
+                flash('Password must contain at least one number.', 'danger')
+            else:
+                import re
+                if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", new_pw):
+                    flash('Password must contain at least one special character.', 'danger')
+                else:
+                    # Update password
+                    # Since user is logged in, their decrypted key is in the session/context
+                    # Calling user.set_password will re-encrypt it under the new password
+                    current_user.set_password(new_pw)
+                    db.session.commit()
+                    AuditService.log("Password Change", "Successfully changed password from settings", user_id=current_user.id)
+                    flash("Your password has been changed successfully.", "success")
+            return redirect(url_for('dashboard.settings'))
+
         # Token Actions
-        if action == 'generate_token':
+        elif action == 'generate_token':
             token_str = current_user.generate_token(expires_in_days=30)
             session['new_token'] = token_str
             
@@ -133,6 +168,10 @@ def settings():
                 db.session.add(Category(user_id=current_user.id, name=name, color=color))
                 db.session.commit()
                 flash("Category added successfully.", "success")
+            
+            next_url = request.args.get('next')
+            if next_url and next_url.startswith('/'):
+                return redirect(next_url)
             return redirect(url_for('dashboard.settings'))
 
         elif action == 'update_category':
@@ -201,6 +240,10 @@ def settings():
                 db.session.add(PaymentMethod(user_id=current_user.id, name=name, color=color))
                 db.session.commit()
                 flash("Payment method added successfully.", "success")
+            
+            next_url = request.args.get('next')
+            if next_url and next_url.startswith('/'):
+                return redirect(next_url)
             return redirect(url_for('dashboard.settings'))
 
         elif action == 'update_payment_method':
@@ -522,3 +565,199 @@ def admin_delete_user(user_id):
         flash(f"Deletion failed: {str(e)}", "danger")
         
     return redirect(url_for('dashboard.admin_panel'))
+
+
+@dashboard.route('/budget', methods=['GET', 'POST'])
+@login_required
+def budget():
+    """Budget planning route."""
+    from decimal import Decimal
+    from datetime import date
+    from app.models.expense import Budget
+    
+    # Calculate upcoming month as default (YYYY-MM)
+    now = datetime.now()
+    if now.month == 12:
+        upcoming_year = now.year + 1
+        upcoming_month = 1
+    else:
+        upcoming_year = now.year
+        upcoming_month = now.month + 1
+    default_month = f"{upcoming_year}-{upcoming_month:02d}"
+    
+    target_month = request.args.get('month', default_month)
+    
+    # Validate target_month matches YYYY-MM format
+    if not re.match(r'^\d{4}-\d{2}$', target_month):
+        target_month = default_month
+
+    # Load categories
+    categories = Category.query.filter_by(user_id=current_user.id).order_by(Category.name).all()
+    cat_names = [c.name for c in categories]
+
+    # Save logic
+    if request.method == 'POST':
+        for cat in categories:
+            amount_str = request.form.get(f"budget_{cat.name}", "").strip()
+            if amount_str:
+                try:
+                    amount_val = Decimal(amount_str)
+                    if amount_val < 0:
+                        amount_val = Decimal('0.00')
+                except Exception:
+                    amount_val = Decimal('0.00')
+                
+                # Check if budget already exists
+                budget_entry = Budget.query.filter_by(
+                    user_id=current_user.id,
+                    month=target_month,
+                    category_name=cat.name
+                ).first()
+                
+                if budget_entry:
+                    budget_entry.amount = amount_val
+                else:
+                    budget_entry = Budget(
+                        user_id=current_user.id,
+                        month=target_month,
+                        category_name=cat.name,
+                        amount=amount_val
+                    )
+                    db.session.add(budget_entry)
+            else:
+                # If blank, remove budget constraint
+                budget_entry = Budget.query.filter_by(
+                    user_id=current_user.id,
+                    month=target_month,
+                    category_name=cat.name
+                ).first()
+                if budget_entry:
+                    db.session.delete(budget_entry)
+        
+        db.session.commit()
+        AuditService.log("Budget Save", f"Saved monthly budget for {target_month}", user_id=current_user.id)
+        flash(f"Budgets for {target_month} saved successfully.", "success")
+        return redirect(url_for('dashboard.budget', month=target_month))
+
+    # Calculate 3-month historical averages
+    # We use complete months prior to the target_month
+    try:
+        t_year, t_month = map(int, target_month.split('-'))
+        t_first_day = date(t_year, t_month, 1)
+    except Exception:
+        t_first_day = date(now.year, now.month, 1)
+        
+    # Standard history range: 3 complete months preceding target_month's first day
+    hist_start_month = t_first_day.month - 3
+    hist_start_year = t_first_day.year
+    while hist_start_month <= 0:
+        hist_start_month += 12
+        hist_start_year -= 1
+    start_date = date(hist_start_year, hist_start_month, 1)
+    end_date = t_first_day - timedelta(days=1)
+    
+    # Calculate target month end date
+    next_month = t_first_day.month + 1
+    next_year = t_first_day.year
+    if next_month > 12:
+        next_month = 1
+        next_year += 1
+    t_end_day = date(next_year, next_month, 1) - timedelta(days=1)
+
+    # Fetch all user expenses (filtering/decryption happens in Python memory)
+    all_user_expenses = Expense.query.filter_by(user_id=current_user.id).all()
+
+    # Filter in python
+    history_expenses = []
+    target_month_expenses = []
+    earliest_date = None
+    
+    for exp in all_user_expenses:
+        try:
+            exp_d = exp.expense_date
+            if isinstance(exp_d, datetime):
+                exp_d = exp_d.date()
+            elif isinstance(exp_d, str):
+                exp_d = datetime.strptime(exp_d, "%Y-%m-%d").date()
+                
+            if exp_d:
+                if earliest_date is None or exp_d < earliest_date:
+                    earliest_date = exp_d
+                
+                if start_date <= exp_d <= end_date:
+                    history_expenses.append(exp)
+                elif t_first_day <= exp_d <= t_end_day:
+                    target_month_expenses.append(exp)
+        except Exception:
+            continue
+            
+    # Sum spending per category
+    category_totals = {name: Decimal('0.00') for name in cat_names}
+    for exp in history_expenses:
+        try:
+            cat_name = exp.category
+            if cat_name in category_totals:
+                category_totals[cat_name] += exp.amount
+        except Exception:
+            continue
+            
+    # Calculate months count of history
+    if earliest_date:
+        days_history = (t_first_day - earliest_date).days
+        months_history = max(1, min(3, (days_history + 15) // 30))
+    else:
+        months_history = 3
+        
+    suggestions = {}
+    for name, total in category_totals.items():
+        suggestions[name] = round(total / Decimal(str(months_history)), 2)
+
+    # Load existing budgets
+    saved_budgets = {b.category_name: b.amount for b in Budget.query.filter_by(user_id=current_user.id, month=target_month).all()}
+
+    # Calculate actual spending for target_month
+    actual_spent = {name: Decimal('0.00') for name in cat_names}
+    for exp in target_month_expenses:
+        try:
+            cat_name = exp.category
+            if cat_name in actual_spent:
+                actual_spent[cat_name] += exp.amount
+        except Exception:
+            continue
+
+    # Prepare spending tracking items
+    budget_vs_spent = []
+    total_budgeted = Decimal('0.00')
+    total_spent = Decimal('0.00')
+    
+    for cat in categories:
+        b_amt = saved_budgets.get(cat.name, Decimal('0.00'))
+        s_amt = actual_spent.get(cat.name, Decimal('0.00'))
+        total_budgeted += b_amt
+        total_spent += s_amt
+        
+        pct = 0
+        if b_amt > 0:
+            pct = int((s_amt / b_amt) * 100)
+            
+        budget_vs_spent.append({
+            'category': cat.name,
+            'color': cat.color,
+            'budgeted': b_amt,
+            'spent': s_amt,
+            'pct': pct
+        })
+
+    budget_vs_spent.sort(key=lambda x: x['category'])
+
+    return render_template(
+        'dashboard/budget.html',
+        target_month=target_month,
+        categories=categories,
+        suggestions=suggestions,
+        saved_budgets=saved_budgets,
+        budget_vs_spent=budget_vs_spent,
+        total_budgeted=total_budgeted,
+        total_spent=total_spent,
+        months_history=months_history
+    )

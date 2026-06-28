@@ -17,6 +17,7 @@ def test_add_expense(client, app, test_user):
     response = client.post('/expenses/add', data={
         'amount': '45.50',
         'currency': 'USD',
+        'conversion_rate': '1.0',
         'category': 'Food',
         'expense_date': '2026-06-24',
         'payee': 'Starbucks',
@@ -61,6 +62,7 @@ def test_edit_expense(client, app, test_user):
     response = client.post(f'/expenses/edit/{exp_id}', data={
         'amount': '120.00',
         'currency': 'USD',
+        'conversion_rate': '1.0',
         'category': 'Utilities',
         'expense_date': '2026-06-01',
         'payee': 'Electric Co',
@@ -147,39 +149,6 @@ def test_legacy_json_import(app, test_user):
         assert result_dup['success_count'] == 0
         assert result_dup['duplicate_count'] == 2
 
-
-def test_csv_import(app, test_user):
-    """Tests the Pandas CSV upload importing service."""
-    csv_content = (
-        "Amount,Category,Date,Payee,Payment Mode,Description\n"
-        "20.50,Snacks,2026-06-20,Coffee shop,Phonepe,Morning espresso\n"
-        "1000.00,Rent,2026-06-01,Landlord,NetBanking,June rent payment\n"
-    )
-    
-    csv_file = io.StringIO(csv_content)
-    
-    with app.app_context():
-        ukey = EncryptionService.get_user_key()
-        if not ukey:
-            EncryptionService.set_override_key(EncryptionService.generate_fernet_key())
-        result = ImportService.import_csv(test_user.id, csv_file)
-        
-        assert result['success'] is True
-        # Snacks maps to Food, Rent remains Rent
-        assert result['success_count'] == 2
-        assert result['error_count'] == 0
-        
-        expenses = Expense.query.filter_by(user_id=test_user.id).all()
-        assert len(expenses) == 2
-        
-        # Verify mapping: Snacks mapped to Food category
-        snacks_exp = None
-        for e in expenses:
-            if e.amount == Decimal('20.50'):
-                snacks_exp = e
-                break
-        assert snacks_exp is not None
-        assert snacks_exp.category == 'Food'
 
 
 def test_standard_json_import(app, test_user):

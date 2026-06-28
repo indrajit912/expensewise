@@ -333,35 +333,21 @@ def api_delete_expense(uuid_str):
 @token_required
 def api_export_expenses():
     """Generates backup file content stream (records in audit logs)."""
-    fmt = request.args.get('format', 'csv').lower()
-    
-    expenses_list = Expense.query.filter_by(user_id=g.current_user.id).all()
-    # Sort in memory
-    expenses_list.sort(key=lambda x: x.expense_date or date.min, reverse=True)
-    
     # Audit log entry
-    AuditService.log("Export", f"API requested data export in {fmt.upper()} format", user_id=g.current_user.id)
+    AuditService.log("Export", "API requested data export in JSON format", user_id=g.current_user.id)
         
-    if fmt == 'json':
-        json_data = ExportService.generate_json(expenses_list)
-        return Response(
-            json_data,
-            mimetype='application/json',
-            headers={'Content-Disposition': 'attachment;filename=expenses_export.json'}
-        )
-    else:
-        csv_data = ExportService.generate_csv(expenses_list)
-        return Response(
-            csv_data,
-            mimetype='text/csv',
-            headers={'Content-Disposition': 'attachment;filename=expenses_export.csv'}
-        )
+    json_data = ExportService.generate_json(g.current_user)
+    return Response(
+        json_data,
+        mimetype='application/json',
+        headers={'Content-Disposition': 'attachment;filename=expenses_export.json'}
+    )
 
 
 @api.route('/v1/import', methods=['POST'])
 @token_required
 def api_import_expenses():
-    """Performs bulk import from raw JSON backup structures or CSV file streams (ownership checked)."""
+    """Performs bulk import from raw JSON backup structures (ownership checked)."""
     if request.is_json:
         json_payload = request.get_json()
         result = ImportService.import_standard_json(g.current_user.id, json_payload)
@@ -380,18 +366,7 @@ def api_import_expenses():
         if file.filename == '':
             return jsonify({'error': 'Bad Request', 'message': 'No file selected.'}), 400
             
-        if file.filename.endswith('.csv'):
-            result = ImportService.import_csv(g.current_user.id, file.stream)
-            status = 200 if result.get('success') else 400
-            
-            if result.get('success'):
-                AuditService.log(
-                    "Import", 
-                    f"API imported CSV file: Added {result['success_count']} expenses, skipped {result['duplicate_count']}", 
-                    user_id=g.current_user.id
-                )
-            return jsonify(result), status
-        elif file.filename.endswith('.json'):
+        if file.filename.endswith('.json'):
             content = file.stream.read().decode('utf-8')
             result = ImportService.import_standard_json(g.current_user.id, content)
             status = 200 if result.get('success') else 400
@@ -404,6 +379,6 @@ def api_import_expenses():
                 )
             return jsonify(result), status
         else:
-            return jsonify({'error': 'Bad Request', 'message': 'Invalid format. Supported: CSV or JSON backup file attachments.'}), 400
+            return jsonify({'error': 'Bad Request', 'message': 'Invalid format. Supported: JSON backup file attachments.'}), 400
 
-    return jsonify({'error': 'Bad Request', 'message': 'Send either a JSON payload or a CSV/JSON multipart file.'}), 400
+    return jsonify({'error': 'Bad Request', 'message': 'Send either a JSON payload or a JSON multipart file.'}), 400

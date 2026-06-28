@@ -189,3 +189,18 @@ class PaymentMethod(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), server_default=db.text('CURRENT_TIMESTAMP'))
 
     user = db.relationship('User', backref=db.backref('custom_payment_methods', cascade='all, delete-orphan'))
+
+
+class Budget(db.Model):
+    """Budget Model to store monthly category-wise budgets."""
+    __tablename__ = 'budgets'
+    __table_args__ = (db.UniqueConstraint('user_id', 'month', 'category_name', name='_user_month_category_budget_uc'),)
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    month = db.Column(db.String(7), nullable=False)  # format YYYY-MM
+    category_name = db.Column(db.String(50), nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), server_default=db.text('CURRENT_TIMESTAMP'))
+
+    user = db.relationship('User', backref=db.backref('budgets', cascade='all, delete-orphan'))

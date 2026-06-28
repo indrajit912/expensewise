@@ -9,7 +9,12 @@ def create_app(config_name=None):
     
     # Load configuration
     if not config_name:
-        config_name = os.environ.get('FLASK_ENV', 'development')
+        flask_env = os.environ.get('FLASK_ENV')
+        if flask_env:
+            config_name = flask_env
+        else:
+            is_debug = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
+            config_name = 'development' if is_debug else 'production'
     
     app.config.from_object(config_by_name[config_name])
     
@@ -69,6 +74,7 @@ def create_app(config_name=None):
     
     from app.api import api as api_blueprint
     app.register_blueprint(api_blueprint, url_prefix='/api')
+    csrf.exempt(api_blueprint)
     
     # Global Error Handlers
     register_error_handlers(app)
@@ -119,6 +125,11 @@ def create_app(config_name=None):
             'PAYMENT_METHOD_COLORS': {}
         }
 
+    @app.context_processor
+    def inject_now():
+        from datetime import datetime
+        return {'current_year': datetime.now().year}
+
     @app.template_filter('hex_to_rgba')
     def hex_to_rgba(hex_color, alpha=0.15):
         if not hex_color:
@@ -149,15 +160,54 @@ def create_app(config_name=None):
         }
         symbol = CURRENCY_SYMBOLS.get(currency_code or 'USD', currency_code or 'USD')
         try:
-            return f"{symbol}{float(amount):,.2f}"
+            val = float(amount)
+            is_negative = val < 0
+            val = abs(val)
+            
+            parts = f"{val:.2f}".split('.')
+            int_part = parts[0]
+            dec_part = parts[1] if len(parts) > 1 else "00"
+            
+            if len(int_part) <= 3:
+                result = int_part
+            else:
+                last_three = int_part[-3:]
+                remaining = int_part[:-3]
+                groups = []
+                while len(remaining) > 0:
+                    if len(remaining) >= 2:
+                        groups.insert(0, remaining[-2:])
+                        remaining = remaining[:-2]
+                    else:
+                        groups.insert(0, remaining)
+                        remaining = ""
+                groups.append(last_three)
+                result = ",".join(groups)
+                
+            formatted = f"{result}.{dec_part}"
+            if is_negative:
+                formatted = f"-{formatted}"
+            return f"{symbol}{formatted}"
         except Exception:
             return f"{symbol}{amount}"
+
+    @app.template_filter('decimal_small')
+    def decimal_small(val):
+        if not val:
+            return ""
+        from markupsafe import Markup
+        val_str = str(val)
+        if '.' in val_str:
+            parts = val_str.split('.')
+            return Markup(f"{parts[0]}<span style='font-size: 0.75em;'>.{parts[1]}</span>")
+        return val_str
         
     # Register CLI Commands
-    from app.cli import bootstrap_system_command, create_admin_command, create_guest_command
+    from app.cli import bootstrap_system_command, create_admin_command, create_guest_command, setup_project_command
     app.cli.add_command(bootstrap_system_command)
     app.cli.add_command(create_admin_command)
     app.cli.add_command(create_guest_command)
+    app.cli.add_command(setup_project_command)
         
     return app
 

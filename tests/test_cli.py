@@ -121,3 +121,42 @@ def test_create_guest_cli(app):
     result_repeat = runner.invoke(args=['create-guest'])
     assert result_repeat.exit_code == 0
     assert "already exists. Re-setting password to 'password'" in result_repeat.output
+
+
+def test_setup_project_cli_abort(app):
+    """Tests that flask setup-project CLI aborts when confirmation is declined."""
+    runner = app.test_cli_runner()
+    
+    # Input 'n' to decline confirmation
+    result = runner.invoke(args=['setup-project'], input="n\n")
+    assert "Setup aborted by user" in result.output
+    assert result.exit_code == 0
+
+
+def test_setup_project_cli_success(app):
+    """Tests successful execution flow of flask setup-project CLI command using mocks."""
+    runner = app.test_cli_runner()
+    
+    with patch('app.cli.shutil.rmtree') as mock_rmtree, \
+         patch('app.cli.os.path.exists', return_value=True), \
+         patch('app.cli.subprocess.run') as mock_run:
+        
+        # Mock subprocess.run to return a success code
+        class MockCompletedProcess:
+            returncode = 0
+        mock_run.return_value = MockCompletedProcess()
+        
+        # Input 'y' to confirm
+        result = runner.invoke(args=['setup-project'], input="y\n")
+        
+        assert result.exit_code == 0
+        assert "WARNING: This command will permanently delete" in result.output
+        assert "Deleted instance directory successfully." in result.output
+        assert "Deleted migrations directory successfully." in result.output
+        assert "Project has been initialized and set up successfully!" in result.output
+        
+        # Check that rmtree was called on instance and migrations paths
+        assert mock_rmtree.call_count == 2
+        
+        # Check that subprocess.run was called for the 5 setup steps
+        assert mock_run.call_count == 5

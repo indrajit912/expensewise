@@ -2,9 +2,12 @@
 # Exposes helper hooks that run directly on 'flask' command contexts.
 
 import os
+import sys
 import json
 import click
+import shutil
 import secrets
+import subprocess
 from decimal import Decimal
 from datetime import datetime, timezone
 from flask.cli import with_appcontext
@@ -99,8 +102,8 @@ def bootstrap_system_command(password):
                     continue
                 for exp in exp_list:
                     amount_val = exp.get('amount', 0.0)
-                    category_name = exp.get('category', 'Other').strip()
-                    payment_mode_name = exp.get('mode', 'Other').strip()
+                    category_name = exp.get('category', 'Others').strip()
+                    payment_mode_name = exp.get('mode', 'Others').strip()
                     payee_name = exp.get('payee', '').strip()
                     description_val = exp.get('message', '').strip()
                     exp_date_str = exp.get('date', date_key)
@@ -248,7 +251,7 @@ def create_guest_command():
         is_active=True,
         is_email_verified=True,
         is_admin=False,
-        default_currency='USD'
+        default_currency='INR'
     )
     guest.set_password('password')
     db.session.add(guest)
@@ -266,3 +269,66 @@ def create_guest_command():
     EncryptionService.clear_user_key()
     
     click.echo("Guest demo user 'guest' (email: 'guest@expensewise.local', password: 'password') created successfully.")
+
+
+@click.command('setup-project')
+@with_appcontext
+def setup_project_command():
+    """Automates the complete first-time project setup from scratch."""
+    from flask import current_app
+    
+    click.echo("======================================================================")
+    click.echo("WARNING: This command will permanently delete your existing database,")
+    click.echo("instance files, and migrations directory. All data will be lost!")
+    click.echo("======================================================================")
+    
+    if not click.confirm("Are you sure you want to proceed and initialize the project?"):
+        click.echo("Setup aborted by user. No changes were made.")
+        return
+
+    project_root = os.path.abspath(os.path.join(current_app.root_path, '..'))
+    instance_path = os.path.join(project_root, 'instance')
+    migrations_path = os.path.join(project_root, 'migrations')
+
+    if os.path.exists(instance_path):
+        click.echo(f"[*] Deleting {instance_path}...")
+        try:
+            shutil.rmtree(instance_path)
+            click.echo("  [+] Deleted instance directory successfully.")
+        except Exception as e:
+            click.echo(f"  [-] Failed to delete instance directory: {str(e)}")
+            raise click.ClickException("Setup aborted due to file system deletion failure.")
+            
+    if os.path.exists(migrations_path):
+        click.echo(f"[*] Deleting {migrations_path}...")
+        try:
+            shutil.rmtree(migrations_path)
+            click.echo("  [+] Deleted migrations directory successfully.")
+        except Exception as e:
+            click.echo(f"  [-] Failed to delete migrations directory: {str(e)}")
+            raise click.ClickException("Setup aborted due to file system deletion failure.")
+
+    steps = [
+        ("Database Initialization (db init)", ["db", "init"]),
+        ("Generate Initial Migration (db migrate)", ["db", "migrate", "-m", "Initial migration"]),
+        ("Apply Database Migrations (db upgrade)", ["db", "upgrade"]),
+        ("Bootstrap System Admin (bootstrap-system)", ["bootstrap-system"]),
+        ("Create Demo Guest Account (create-guest)", ["create-guest"])
+    ]
+
+    for step_name, args in steps:
+        click.echo(f"\n[*] Starting Step: {step_name}...")
+        try:
+            result = subprocess.run([sys.executable, "-m", "flask"] + args)
+            if result.returncode != 0:
+                click.echo(f"\n[-] Step Failed: {step_name} (Exit code {result.returncode})")
+                raise click.ClickException(f"Setup failed at step: {step_name}.")
+            else:
+                click.echo(f"[+] Step Succeeded: {step_name}")
+        except Exception as e:
+            click.echo(f"\n[-] Step Failed: {step_name}")
+            raise click.ClickException(f"Setup failed at step: {step_name} with error: {str(e)}")
+
+    click.echo("\n======================================================================")
+    click.echo("[+] Success: Project has been initialized and set up successfully!")
+    click.echo("======================================================================")

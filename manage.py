@@ -3,7 +3,10 @@ from app import create_app, db
 from app.models import User, Expense, APIToken
 
 # Obtain configuration target environment
-flask_env = os.environ.get('FLASK_ENV', 'development')
+flask_env = os.environ.get('FLASK_ENV')
+if not flask_env:
+    is_debug = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
+    flask_env = 'development' if is_debug else 'production'
 app = create_app(flask_env)
 
 @app.shell_context_processor

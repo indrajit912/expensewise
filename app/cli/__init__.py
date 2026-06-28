@@ -299,15 +299,6 @@ def setup_project_command():
             click.echo(f"  [-] Failed to delete instance directory: {str(e)}")
             raise click.ClickException("Setup aborted due to file system deletion failure.")
             
-    if os.path.exists(migrations_path):
-        click.echo(f"[*] Deleting {migrations_path}...")
-        try:
-            shutil.rmtree(migrations_path)
-            click.echo("  [+] Deleted migrations directory successfully.")
-        except Exception as e:
-            click.echo(f"  [-] Failed to delete migrations directory: {str(e)}")
-            raise click.ClickException("Setup aborted due to file system deletion failure.")
-
     steps = [
         ("Database Initialization (db init)", ["db", "init"]),
         ("Generate Initial Migration (db migrate)", ["db", "migrate", "-m", "Initial migration"]),

@@ -6,6 +6,15 @@ from unittest.mock import patch
 from app import db
 from app.models.expense import Expense
 
+
+def test_schemas_import_successfully():
+    """Schemas should import cleanly with the installed Marshmallow extensions."""
+    from app.api.schemas import UserSchema, ExpenseSchema
+
+    assert UserSchema is not None
+    assert ExpenseSchema is not None
+
+
 def test_api_auth_register(client):
     """Tests registering an account via the REST API endpoint."""
     with patch('random.randint', return_value=123456):

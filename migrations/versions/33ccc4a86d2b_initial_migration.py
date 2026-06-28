@@ -1,8 +1,8 @@
 """Initial migration
 
-Revision ID: d09a9024b9ee
+Revision ID: 33ccc4a86d2b
 Revises: 
-Create Date: 2026-06-28 10:36:33.530378
+Create Date: 2026-06-28 13:10:40.389904
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'd09a9024b9ee'
+revision = '33ccc4a86d2b'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -66,6 +66,20 @@ def upgrade():
     )
     with op.batch_alter_table('audit_logs', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_audit_logs_user_id'), ['user_id'], unique=False)
+
+    op.create_table('budgets',
+    sa.Column('id', sa.String(length=36), nullable=False),
+    sa.Column('user_id', sa.String(length=36), nullable=False),
+    sa.Column('month', sa.String(length=7), nullable=False),
+    sa.Column('category_name', sa.String(length=50), nullable=False),
+    sa.Column('amount', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'month', 'category_name', name='_user_month_category_budget_uc')
+    )
+    with op.batch_alter_table('budgets', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_budgets_user_id'), ['user_id'], unique=False)
 
     op.create_table('categories',
     sa.Column('id', sa.String(length=36), nullable=False),
@@ -148,6 +162,10 @@ def downgrade():
         batch_op.drop_index(batch_op.f('ix_categories_user_id'))
 
     op.drop_table('categories')
+    with op.batch_alter_table('budgets', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_budgets_user_id'))
+
+    op.drop_table('budgets')
     with op.batch_alter_table('audit_logs', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_audit_logs_user_id'))
 

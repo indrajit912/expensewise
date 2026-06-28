@@ -1,4 +1,5 @@
 import click
+import os
 import re
 import json
 import requests
@@ -22,7 +23,23 @@ CURRENCY_SYMBOLS = {
 }
 
 def get_currency_symbol(currency_code):
-    return CURRENCY_SYMBOLS.get(currency_code or 'USD', currency_code or '$')
+    import sys
+    symbol = CURRENCY_SYMBOLS.get(currency_code or 'USD', currency_code or '$')
+    try:
+        encoding = sys.stdout.encoding or 'utf-8'
+        symbol.encode(encoding)
+        return symbol
+    except Exception:
+        # Fallback to standard ASCII
+        if currency_code == 'INR':
+            return 'Rs. '
+        elif currency_code == 'EUR':
+            return 'EUR '
+        elif currency_code == 'GBP':
+            return 'GBP '
+        elif currency_code == 'JPY':
+            return 'JPY '
+        return currency_code + ' '
 
 def check_login():
     """Helper to check if user has authenticated."""
@@ -43,54 +60,195 @@ def cli():
 
 
 # ==============================================================================
+# CONFIGURATION COMMANDS
+# ==============================================================================
+
+@cli.group(name='config')
+def config_group():
+    """Manage local configuration options for the CLI client (e.g. API URL)."""
+    pass
+
+@config_group.command(name='show')
+def config_show():
+    """Displays the currently configured API server URL and active state."""
+    env_url = os.environ.get('EXPENSEWISE_API_URL')
+    stored_url = None
+    if os.path.exists(client.config_file_path):
+        try:
+            with open(client.config_file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                stored_url = data.get('api_url')
+        except Exception:
+            pass
+
+    console.print("[bold cyan]ExpenseWise CLI Configuration Settings[/]")
+    
+    # Show active URL
+    active_url = client.api_url
+    console.print(f"Active Server URL  : [bold green]{active_url}[/]")
+    
+    # Detail resolve source
+    if env_url:
+        console.print("Resolution Source  : [bold yellow]Environment Variable Override (EXPENSEWISE_API_URL)[/]")
+    elif stored_url:
+        console.print("Resolution Source  : [bold green]Stored Local Configuration[/]")
+    else:
+        console.print("Resolution Source  : [bold dim]Default Local Fallback[/]")
+
+    console.print(f"Stored Config URL  : [cyan]{stored_url or 'None (Using default localhost)'}[/]")
+    console.print(f"Env Variable URL   : [cyan]{env_url or 'Not Set'}[/]")
+
+@config_group.command(name='set-url')
+@click.argument('url')
+def config_set_url(url):
+    """Updates the stored API server URL (e.g. https://expensewise.pythonanywhere.com/api)."""
+    if not url.startswith(('http://', 'https://')):
+        console.print("[bold red]Error:[/] The URL must start with http:// or https://")
+        raise click.Abort()
+
+    cleaned_url = url.rstrip('/')
+    if client.save_config_url(cleaned_url):
+        console.print(f"[bold green]Success![/] Configured API Server URL updated to: [bold]{cleaned_url}[/]")
+    else:
+        console.print("[bold red]Error:[/] Failed to write the configuration to local storage.")
+
+@config_group.command(name='reset')
+def config_reset():
+    """Resets the configured URL to the default (http://localhost:5000/api)."""
+    if client.reset_config_url():
+        console.print("[bold green]Success![/] Configured URL removed from local storage.")
+    else:
+        console.print("[yellow]Note: No custom URL was configured in local storage.[/]")
+    
+    console.print(f"Resolved Server URL: [bold green]{client.api_url}[/]")
+
+
+# ==============================================================================
 # USER MANAGEMENT COMMANDS
 # ==============================================================================
 
 @cli.command()
-@click.option('--email', prompt='Email Address', help='Your registration email')
-@click.option('--password', prompt=True, hide_input=True, help='Your password')
-def login(email, password):
-    """Authenticates credentials and downloads API Access Key."""
-    console.print(f"Connecting to [bold cyan]{client.api_url}[/]...")
-    response = client.login(email, password)
+def login():
+    """Authenticates the terminal client session securely with the server."""
+    console.print(Panel(
+        "Select an Authentication Method:\n"
+        "[bold green]1)[/] Email & Password credentials exchange\n"
+        "[bold green]2)[/] API Token secure entry",
+        title="ExpenseWise Authentication Portal",
+        border_style="cyan"
+    ))
     
-    if response.status_code == 200:
-        data = response.json()
-        token = data.get('token')
+    from rich.prompt import Prompt
+    choice = Prompt.ask("Choose login method", choices=["1", "2"], default="1")
+    
+    if choice == "1":
+        email = click.prompt("Email Address or Username", type=str)
+        password = click.prompt("Password", hide_input=True, type=str)
+        
+        console.print(f"Connecting to [bold cyan]{client.api_url}[/]...")
+        response = client.login(email, password)
+        
+        if response.status_code == 200:
+            data = response.json()
+            token = data.get('token')
+            client.save_token(token)
+            console.print(f"[bold green]Success![/] Welcome back, [bold]{data['user']['name']}[/]. Access token saved securely.")
+        else:
+            err_msg = response.json().get('message', 'Check your credentials.')
+            console.print(f"[bold red]Login Failed:[/] {err_msg}")
+            
+    elif choice == "2":
+        token = Prompt.ask("Enter API Token", password=True)
+        token = token.strip()
+        if not token:
+            console.print("[bold red]Error:[/] API Token cannot be empty.")
+            return
+            
+        console.print("Verifying API token with server...")
         client.save_token(token)
-        console.print(f"[bold green]Success![/] Welcome back, [bold]{data['user']['name']}[/]. Access token saved locally.")
+        res = client.get_profile()
+        if res.status_code == 200:
+            data = res.json()
+            console.print(f"[bold green]Success![/] API Token authenticated. Logged in as [bold]{data.get('name')}[/].")
+        else:
+            client.clear_token()
+            console.print("[bold red]Authentication Failed:[/] The provided token is invalid or expired.")
+
+
+@cli.group(name='auth')
+def auth():
+    """Manage CLI client session authentication and token credentials."""
+    pass
+
+
+@auth.command(name='status')
+def auth_status():
+    """Displays active session login and credential details."""
+    token = client.load_token()
+    if not token:
+        console.print("[bold yellow]Status:[/] Unauthenticated. Run [bold green]expensewise-cli login[/] to connect.")
+        return
+        
+    res = client.get_profile()
+    if res.status_code == 200:
+        data = res.json()
+        masked = f"{token[:6]}...{token[-4:]}" if len(token) > 10 else "****"
+        
+        table = Table(title="Authentication Credentials Status", title_style="bold green")
+        table.add_column("Field", style="cyan")
+        table.add_column("Details", style="white")
+        table.add_row("User Profile", data.get('name'))
+        table.add_row("Email Address", data.get('email'))
+        table.add_row("Active Token", masked)
+        table.add_row("Server Host", client.api_url)
+        table.add_row("Session State", "[bold green]Active & Verified[/]")
+        console.print(table)
     else:
-        err_msg = response.json().get('message', 'Check your credentials.')
-        console.print(f"[bold red]Login Failed:[/] {err_msg}")
+        masked = f"{token[:6]}...{token[-4:]}" if len(token) > 10 else "****"
+        console.print("[bold red]Status Error:[/] Stored token is invalid, expired, or rejected by server.")
+        console.print(f"Stored Token Hint: [dim]{masked}[/]")
+        console.print("Run [bold yellow]expensewise-cli login[/] to authenticate again.")
 
 
-@cli.command(name='token-login')
-@click.argument('token')
-def token_login(token):
-    """Authenticates using a web-generated API token copied from settings."""
+@auth.command(name='token')
+def auth_token():
+    """Securely prompts for and saves a web-generated API token."""
+    from rich.prompt import Prompt
+    token = Prompt.ask("Enter API Token", password=True)
+    token = token.strip()
+    if not token:
+        console.print("[bold red]Error:[/] Token value cannot be empty.")
+        return
+        
     console.print("Verifying API token with server...")
     client.save_token(token)
     res = client.get_profile()
     if res.status_code == 200:
         data = res.json()
-        console.print(f"[bold green]Success![/] API Token authenticated. Logged in as [bold]{data.get('name')}[/].")
+        console.print(f"[bold green]Success![/] API Token verified and saved securely. Logged in as [bold]{data.get('name')}[/].")
     else:
         client.clear_token()
         console.print("[bold red]Authentication Failed:[/] The provided token is invalid or expired.")
 
 
 @cli.command()
-def logout():
-    """Revokes active API key and clears local configuration."""
+@click.option('--revoke', is_flag=True, help='Explicitly revoke/delete the active token on the server as well.')
+def logout(revoke):
+    """Logs out by clearing the local session token. Optionally revokes the token on the server."""
     if not client.load_token():
         console.print("[yellow]You are not currently logged in.[/]")
         return
         
-    response = client.logout()
-    if response.status_code == 200:
-        console.print("[bold green]Success![/] Local token cleared and session revoked on server.")
+    if revoke:
+        console.print("Contacting server to revoke and invalidate the active token...")
+        response = client.logout()
+        if response.status_code == 200:
+            console.print("[bold green]Success![/] Local token cleared and session revoked on the server.")
+        else:
+            console.print("[bold yellow]Warning:[/] Failed to revoke token on server (it may already be invalid). Local token cleared anyway.")
     else:
-        console.print("[bold yellow]Warning:[/] Failed to revoke token on server. Local configuration cleared anyway.")
+        client.clear_token()
+        console.print("[bold green]Success![/] Local session token cleared from your machine. Stored API token remains valid on the server.")
 
 
 @cli.command()
@@ -297,7 +455,7 @@ def list_categories():
     if res.status_code == 200:
         categories = res.json()
         table = Table(title="Expense Categories")
-        table.add_column("UUID", style="dim", max_width=12)
+        table.add_column("UUID", style="dim", no_wrap=True)
         table.add_column("Category Name", style="bold cyan")
         table.add_column("Color Badge", style="white")
         
@@ -361,7 +519,7 @@ def list_payments():
     if res.status_code == 200:
         pms = res.json()
         table = Table(title="Payment Channels")
-        table.add_column("UUID", style="dim", max_width=12)
+        table.add_column("UUID", style="dim", no_wrap=True)
         table.add_column("Payment Mode", style="bold blue")
         table.add_column("Color Badge", style="white")
         
@@ -439,6 +597,15 @@ def budget_show(month):
         table.add_column("Usage Progress Bar", style="white")
         table.add_column("Status / Left", style="white")
         
+        try:
+            import sys
+            "█░".encode(sys.stdout.encoding or 'utf-8')
+            bar_char_filled = "█"
+            bar_char_empty = "░"
+        except Exception:
+            bar_char_filled = "#"
+            bar_char_empty = "-"
+
         for item in data.get('categories', []):
             b_val = item.get('budgeted')
             s_val = item.get('spent')
@@ -449,7 +616,7 @@ def budget_show(month):
             
             # Progress bar
             bar_len = min(15, int((pct / 100) * 15)) if b_val > 0 else 0
-            bar = "█" * bar_len + "░" * (15 - bar_len)
+            bar = bar_char_filled * bar_len + bar_char_empty * (15 - bar_len)
             
             if b_val > 0:
                 is_over = s_val > b_val
@@ -599,55 +766,130 @@ def import_backup(input_file):
 
 
 # ==============================================================================
-# ANALYTICS & TERMINAL CHARTS
-# ==============================================================================
-
-@cli.command()
-def analytics():
-    """Displays rollups, MoM comparison changes, and projections in the terminal."""
+@cli.command(name='summary')
+@click.option('--start-date', default='', help='Format: YYYY-MM-DD')
+@click.option('--end-date', default='', help='Format: YYYY-MM-DD')
+@click.option('--category', default='', help='Filter by category name')
+@click.option('--category-wise', is_flag=True, help='Display category-wise spending breakdown table')
+@click.pass_context
+def display_summary(ctx, start_date, end_date, category, category_wise):
+    """Displays spending summaries over a specified date range and breakdown."""
     check_login()
     
-    sum_res = client.get_analytics_summary()
-    fore_res = client.get_analytics_forecast()
-    trend_res = client.get_analytics_trends()
-    
-    if sum_res.status_code != 200 or fore_res.status_code != 200 or trend_res.status_code != 200:
-        console.print("[bold red]Failed to retrieve analytics metrics.[/]")
+    res = client.get_analytics_summary(category=category, start_date=start_date, end_date=end_date)
+    if res.status_code != 200:
+        console.print("[bold red]Failed to retrieve spending summary metrics.[/]")
         return
         
-    sum_data = sum_res.json()
-    metrics = sum_data.get('metrics', {})
-    comp = sum_data.get('comparison', {})
-    forecast = fore_res.json().get('predicted_next_month_spending', 0.0)
-    trends = trend_res.json().get('category_distribution', {})
-    default_currency = sum_data.get('default_currency', 'USD')
+    data = res.json()
+    metrics = data.get('metrics', {})
+    default_currency = data.get('default_currency', 'USD')
     symbol = get_currency_symbol(default_currency)
     
-    # 1. Metric Cards panel
-    metrics_panel = (
-        f"Total Filtered Spending : [bold yellow]{symbol}{metrics.get('total_spending', 0.0):,.2f}[/]\n"
-        f"Daily Averaged Spending : [bold magenta]{symbol}{metrics.get('daily_average', 0.0):,.2f}[/]\n"
-        f"Transactions Count      : [bold]{metrics.get('total_count', 0)}[/]"
-    )
-    console.print(Panel(metrics_panel, title="Spending Metrics Overview", border_style="cyan"))
+    is_custom = data.get('custom', False)
     
-    # 2. Month-over-Month Comparison Card
-    diff = comp.get('difference', 0.0)
-    pct = comp.get('percentage_change', 0.0)
-    sign = "+" if diff > 0 else "-"
-    style = "bold red" if diff > 0 else "bold green"
-    comp_panel = (
-        f"Budget Difference : [{style}]{sign}{symbol}{abs(diff):,.2f}[/]\n"
-        f"Percentage Change : [{style}]{pct:,.1f}% change MoM[/]"
-    )
-    console.print(Panel(comp_panel, title="Vs. Previous Month", border_style="cyan"))
+    if is_custom:
+        start_str = data.get('start_date') or start_date or 'Beginning'
+        end_str = data.get('end_date') or end_date or 'Present'
+        title = f"Spending Summary: {start_str} to {end_str}"
+        
+        metrics_panel = (
+            f"Total Spending       : [bold yellow]{symbol}{metrics.get('total_spending', 0.0):,.2f}[/]\n"
+            f"Daily Average        : [bold magenta]{symbol}{metrics.get('daily_average', 0.0):,.2f}[/]\n"
+            f"Average Transaction  : [bold green]{symbol}{metrics.get('average_transaction', 0.0):,.2f}[/]\n"
+            f"Transactions Count   : [bold]{metrics.get('total_count', 0)}[/]"
+        )
+        console.print(Panel(metrics_panel, title=title, border_style="cyan"))
+    else:
+        metrics_panel = (
+            f"Total Filtered Spending : [bold yellow]{symbol}{metrics.get('total_spending', 0.0):,.2f}[/]\n"
+            f"Daily Averaged Spending : [bold magenta]{symbol}{metrics.get('daily_average', 0.0):,.2f}[/]\n"
+            f"Transactions Count      : [bold]{metrics.get('total_count', 0)}[/]"
+        )
+        console.print(Panel(metrics_panel, title="Spending Metrics Overview (Last 30 Days)", border_style="cyan"))
+        
+        comp = data.get('comparison', {})
+        diff = comp.get('difference', 0.0)
+        pct = comp.get('percentage_change', 0.0)
+        sign = "+" if diff > 0 else "-"
+        style = "bold red" if diff > 0 else "bold green"
+        comp_panel = (
+            f"Budget Difference : [{style}]{sign}{symbol}{abs(diff):,.2f}[/]\n"
+            f"Percentage Change : [{style}]{pct:,.1f}% change MoM[/]"
+        )
+        console.print(Panel(comp_panel, title="Vs. Previous Month", border_style="cyan"))
+        
+        fore_res = client.get_analytics_forecast()
+        if fore_res.status_code == 200:
+            forecast = fore_res.json().get('predicted_next_month_spending', 0.0)
+            console.print(Panel(
+                f"Projected Spending Next Month: [bold yellow]{symbol}{forecast:,.2f}[/]",
+                title="Linear Regression Spending Forecast",
+                border_style="magenta"
+            ))
 
-    # 3. Forecast
-    console.print(Panel(
-        f"Projected Spending Next Month: [bold yellow]{symbol}{forecast:,.2f}[/]",
-        title="Linear Regression Spending Forecast",
-        border_style="magenta"
-    ))
+    if category_wise:
+        categories = data.get('categories', [])
+        if not categories:
+            console.print("[yellow]No category data available for the breakdown.[/]")
+        else:
+            table = Table(title="Category-wise Spending Breakdown")
+            table.add_column("Category", style="bold cyan")
+            table.add_column("Total Spent", style="bold yellow", justify="right")
+            table.add_column("Percentage", style="bold green", justify="right")
+            table.add_column("Transactions", style="white", justify="right")
+            
+            for item in categories:
+                table.add_row(
+                    item.get('category'),
+                    f"{symbol}{item.get('total', 0.0):,.2f}",
+                    f"{item.get('pct', 0.0):.1f}%",
+                    str(item.get('count', 0))
+                )
+            console.print(table)
+            
+            # Draw spending shares block chart
+            console.print("\n[bold]Spending Share Chart:[/]")
+            try:
+                import sys
+                "█░".encode(sys.stdout.encoding or 'utf-8')
+                bar_char_filled = "█"
+                bar_char_empty = "░"
+            except Exception:
+                bar_char_filled = "#"
+                bar_char_empty = "-"
+                
+            max_cat_len = max(len(c.get('category', '')) for c in categories) if categories else 10
+            max_amt = max(c.get('total', 0.0) for c in categories) if categories else 1.0
+            
+            for item in categories:
+                cat = item.get('category', 'Other')
+                amt = item.get('total', 0.0)
+                pct = item.get('pct', 0.0)
+                
+                bar_len = int((amt / max_amt) * 30) if max_amt > 0 else 0
+                bar = bar_char_filled * bar_len + bar_char_empty * (30 - bar_len)
+                
+                color_map = ["red", "green", "yellow", "blue", "magenta", "cyan"]
+                idx = categories.index(item) % len(color_map)
+                color = color_map[idx]
+                
+                console.print(
+                    f"[bold {color}]{cat.ljust(max_cat_len)}[/] | "
+                    f"[{color}]{bar}[/] | "
+                    f"[bold]{symbol}{amt:,.2f}[/] ({pct:.1f}%)"
+                )
+
+
+@cli.command(name='analytics')
+@click.option('--start-date', default='', help='Format: YYYY-MM-DD')
+@click.option('--end-date', default='', help='Format: YYYY-MM-DD')
+@click.option('--category', default='', help='Filter by category name')
+@click.option('--category-wise', is_flag=True, help='Display category-wise spending breakdown table')
+@click.pass_context
+def display_analytics_alias(ctx, start_date, end_date, category, category_wise):
+    """Alias for 'summary' command. Displays spending summaries and breakdowns."""
+    ctx.invoke(display_summary, start_date=start_date, end_date=end_date, category=category, category_wise=category_wise)
 
 
 @cli.command(name='chart')
@@ -658,38 +900,21 @@ def display_chart(category, start_date, end_date):
     """Generates colorful terminal-based spending charts."""
     check_login()
     
-    page = 1
-    all_expenses = []
-    while True:
-        res = client.list_expenses(page=page, search='', category=category, start_date=start_date, end_date=end_date)
-        if res.status_code != 200:
-            break
-        data = res.json()
-        exps = data.get('expenses', [])
-        if not exps:
-            break
-        all_expenses.extend(exps)
-        total_pages = data.get('pagination', {}).get('total_pages', 1)
-        if page >= total_pages:
-            break
-        page += 1
-
-    if not all_expenses:
+    res = client.get_analytics_trends(category=category, start_date=start_date, end_date=end_date)
+    if res.status_code != 200:
+        console.print("[bold red]Failed to retrieve chart analytics metrics.[/]")
+        return
+        
+    data = res.json()
+    group_data = data.get('category_distribution', {})
+    
+    if not group_data:
         console.print("[yellow]No expense data found in the specified range.[/]")
         return
-
-    # Group expenses by category
-    group_data = {}
-    for exp in all_expenses:
-        cat = exp.get('category', 'Other')
-        amt = float(exp.get('amount', 0.0))
-        group_data[cat] = group_data.get(cat, 0.0) + amt
-
+        
     total_spent = sum(group_data.values())
     
-    # Render chart title
-    p_res = client.get_profile()
-    currency = p_res.json().get('default_currency', 'USD') if p_res.status_code == 200 else 'USD'
+    currency = data.get('default_currency', 'USD')
     symbol = get_currency_symbol(currency)
 
     console.print(Panel(
@@ -704,11 +929,20 @@ def display_chart(category, start_date, end_date):
     
     max_amt = max(group_data.values()) if group_data else 1.0
 
+    try:
+        import sys
+        "█░".encode(sys.stdout.encoding or 'utf-8')
+        bar_char_filled = "█"
+        bar_char_empty = "░"
+    except Exception:
+        bar_char_filled = "#"
+        bar_char_empty = "-"
+
     for cat, amt in sorted_groups:
         pct = (amt / total_spent) * 100 if total_spent > 0 else 0
         # Normalize to a bar width of 30 characters
         bar_len = int((amt / max_amt) * 30) if max_amt > 0 else 0
-        bar = "█" * bar_len + "░" * (30 - bar_len)
+        bar = bar_char_filled * bar_len + bar_char_empty * (30 - bar_len)
         
         color_map = ["red", "green", "yellow", "blue", "magenta", "cyan"]
         idx = sorted_groups.index((cat, amt)) % len(color_map)

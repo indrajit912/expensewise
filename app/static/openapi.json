@@ -1,0 +1,508 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "ExpenseWise REST API",
+    "version": "1.0.0",
+    "description": "Developer API for ExpenseWise personal finance tracker. All endpoints return JSON and require authorization headers for private data."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API Token",
+        "description": "Enter your personal secure API Token generated from settings."
+      }
+    }
+  },
+  "paths": {
+    "/v1/auth/register": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Register a new user account",
+        "description": "Creates a temporary account and triggers an email verification code (OTP) sent to the specified address.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                },
+                "required": ["name", "email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created. OTP code sent successfully.",
+            "content": {
+              "application/json": {
+                "example": { "message": "OTP code sent to email." }
+              }
+            }
+          },
+          "400": { "description": "Invalid payload or validation failed." }
+        }
+      }
+    },
+    "/v1/auth/verify-otp": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Verify OTP registration code",
+        "description": "Verifies the email verification OTP to fully activate the newly registered user account.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "otp": { "type": "string" }
+                },
+                "required": ["email", "otp"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified and account activated.",
+            "content": {
+              "application/json": {
+                "example": { "message": "Email verified successfully." }
+              }
+            }
+          },
+          "400": { "description": "Incorrect or expired verification code." }
+        }
+      }
+    },
+    "/v1/auth/resend-otp": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Request a fresh verification OTP",
+        "description": "Generates and sends a new registration OTP code via email for an unverified account. Rate-limited to one request per 60 seconds.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "user_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP resent successfully.",
+            "content": {
+              "application/json": {
+                "example": { "message": "A fresh verification OTP has been sent to your email address." }
+              }
+            }
+          },
+          "400": { "description": "Account is already verified or not found." },
+          "429": { "description": "Too many requests. Please wait before requesting another OTP." }
+        }
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Login and retrieve API token",
+        "description": "Exchanges credentials for a valid API Bearer access token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "token": "TBY4XiyEpfa5b66d4...",
+                  "user": {
+                    "id": "abc-123",
+                    "name": "Indrajit Ghosh",
+                    "email": "indrajitghosh912@gmail.com"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Incorrect credentials." }
+        }
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Revoke API access token",
+        "description": "Deletes the token record on the server database to render it permanently invalid.",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Token revoked successfully.",
+            "content": {
+              "application/json": {
+                "example": { "message": "Logged out successfully. Token invalidated." }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized. Missing or invalid Bearer token." }
+        }
+      }
+    },
+    "/v1/expenses": {
+      "get": {
+        "tags": ["Expenses"],
+        "summary": "List and filter user expenses",
+        "description": "Retrieves a paginated ledger list of all custom expenses. Decrypts encrypted columns dynamically.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" }, "description": "Page index (1-based)" },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Substring match description/payee" },
+          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by exact category name" },
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "YYYY-MM-DD start filter" },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "YYYY-MM-DD end filter" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A paginated list of expenses.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "expenses": [
+                    {
+                      "id": "e391-4fa1",
+                      "amount": 123.45,
+                      "category": "Food",
+                      "description": "Lunch meeting",
+                      "payee": "Subway",
+                      "expense_date": "2026-06-15",
+                      "payment_mode": "Credit Card"
+                    }
+                  ],
+                  "pagination": {
+                    "page": 1,
+                    "total_pages": 1,
+                    "total_items": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Expenses"],
+        "summary": "Save a new expense record",
+        "description": "Creates and encrypts a new expense entry for the user.",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "number" },
+                  "category": { "type": "string" },
+                  "payee": { "type": "string" },
+                  "expense_date": { "type": "string", "format": "date" },
+                  "description": { "type": "string" },
+                  "payment_mode": { "type": "string" }
+                },
+                "required": ["amount", "category", "expense_date"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Expense saved successfully.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Expense saved successfully.",
+                  "expense": { "id": "e391-4fa1" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/expenses/{uuid}": {
+      "get": {
+        "tags": ["Expenses"],
+        "summary": "Retrieve single expense details",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expense details.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "id": "e391-4fa1",
+                  "amount": 123.45,
+                  "category": "Food",
+                  "description": "Lunch meeting",
+                  "payee": "Subway",
+                  "expense_date": "2026-06-15",
+                  "payment_mode": "Credit Card"
+                }
+              }
+            }
+          },
+          "404": { "description": "Expense not found." }
+        }
+      },
+      "put": {
+        "tags": ["Expenses"],
+        "summary": "Update an existing expense details",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "number" },
+                  "category": { "type": "string" },
+                  "payee": { "type": "string" },
+                  "expense_date": { "type": "string", "format": "date" },
+                  "description": { "type": "string" },
+                  "payment_mode": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Expense updated successfully.",
+            "content": {
+              "application/json": {
+                "example": { "message": "Expense updated successfully." }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Expenses"],
+        "summary": "Delete an expense record",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expense deleted successfully.",
+            "content": {
+              "application/json": {
+                "example": { "message": "Expense deleted successfully." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/categories": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "List custom categories",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of categories.",
+            "content": {
+              "application/json": {
+                "example": [
+                  { "id": "cat-01", "name": "Food", "color": "#f97316" }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Categories"],
+        "summary": "Add a custom category",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "color": { "type": "string", "example": "#f97316" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Category created successfully.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Category created successfully.",
+                  "category": { "id": "cat-01", "name": "Food" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payment-methods": {
+      "get": {
+        "tags": ["Payment Methods"],
+        "summary": "List user payment channels",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of payment methods.",
+            "content": {
+              "application/json": {
+                "example": [
+                  { "id": "pm-01", "name": "Cash", "color": "#475569" }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics/summary": {
+      "get": {
+        "tags": ["Reports & Analytics"],
+        "summary": "Fetch summary metrics and category allocations",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "category", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Overview aggregations.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "metrics": {
+                    "total_spending": 3200.45,
+                    "daily_average": 106.68,
+                    "total_count": 10
+                  },
+                  "categories": [
+                    { "category": "Food", "total": 120.0, "pct": 10.0, "count": 2 }
+                  ],
+                  "default_currency": "INR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics/trends": {
+      "get": {
+        "tags": ["Reports & Analytics"],
+        "summary": "Fetch category-wise sums and trends",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "category", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category allocations and trends.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "category_distribution": {
+                    "Food": 320.65,
+                    "Travel": 165.08
+                  },
+                  "default_currency": "INR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export": {
+      "get": {
+        "tags": ["Import/Export"],
+        "summary": "Backup the user database to JSON v2.0 file",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Backup payload."
+          }
+        }
+      }
+    },
+    "/v1/import": {
+      "post": {
+        "tags": ["Import/Export"],
+        "summary": "Restore/merge database from local JSON backup",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backup restored successfully."
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Developer API Documentation - ExpenseWise{% endblock %}
+
+{% block extra_head %}
+<style>
+    .endpoint-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 5px solid #475569;
+    }
+    .endpoint-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05) !important;
+    }
+    .method-get { border-left-color: #0d6efd; }
+    .method-post { border-left-color: #198754; }
+    .method-put { border-left-color: #fd7e14; }
+    .method-delete { border-left-color: #dc3545; }
+    
+    .badge-get { background-color: #0d6efd; color: white; }
+    .badge-post { background-color: #198754; color: white; }
+    .badge-put { background-color: #fd7e14; color: white; }
+    .badge-delete { background-color: #dc3545; color: white; }
+    
+    .sidebar-sticky {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 2rem;
+    }
+    
+    pre {
+        background-color: #1e293b;
+        color: #f8fafc;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        font-family: var(--bs-font-monospace);
+        font-size: 0.875em;
+        overflow-x: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12 d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+        <div>
+            <h1 class="font-outfit fw-bold mb-1">Developer API Portal</h1>
+            <p class="text-muted mb-0">Integrate, automate, and build custom client utilities using versioned REST APIs</p>
+        </div>
+        <div class="mt-3 mt-md-0 d-flex gap-2">
+            <a href="{{ url_for('dashboard.api_swagger') }}" class="btn btn-outline-primary d-flex align-items-center">
+                <i class="bi bi-rocket-takeoff me-2"></i> Swagger Console
+            </a>
+            <a href="{{ url_for('dashboard.api_redoc') }}" class="btn btn-outline-secondary d-flex align-items-center">
+                <i class="bi bi-book me-2"></i> ReDoc Spec
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Sidebar Index -->
+    <div class="col-lg-3 mb-4">
+        <div class="card shadow-sm sidebar-sticky">
+            <div class="card-header bg-dark text-white fw-bold font-outfit">
+                <i class="bi bi-list-nested me-2"></i>API Resources
+            </div>
+            <div class="list-group list-group-flush">
+                {% for tag in grouped_endpoints.keys() %}
+                <a href="#group-{{ tag|lower|replace(' ', '-') }}" class="list-group-item list-group-item-action font-inter small d-flex justify-content-between align-items-center">
+                    {{ tag }}
+                    <span class="badge bg-secondary rounded-pill">{{ grouped_endpoints[tag]|length }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Docs Body -->
+    <div class="col-lg-9">
+        <!-- Auth Guidance Card -->
+        <div class="card border-primary bg-primary-subtle shadow-sm p-4 mb-5 rounded-3">
+            <h3 class="h5 fw-bold text-primary-emphasis font-outfit mb-3">
+                <i class="bi bi-shield-lock-fill me-2"></i>API Authentication
+            </h3>
+            <p class="mb-3">
+                To access private user data, requests must include the generated personal API access token as a Bearer authorization header:
+            </p>
+            <pre class="mb-3">Authorization: Bearer &lt;YOUR_API_TOKEN&gt;</pre>
+            <p class="small text-muted mb-0">
+                <i class="bi bi-info-circle me-1"></i> You can manage and copy your active secure API tokens on the <a href="{{ url_for('dashboard.settings') }}">Settings Page</a>. Keep your keys secret.
+            </p>
+        </div>
+
+        <!-- Grouped Endpoints -->
+        {% for tag, endpoints in grouped_endpoints.items() %}
+        <div id="group-{{ tag|lower|replace(' ', '-') }}" class="mb-5">
+            <h2 class="h4 fw-bold font-outfit border-bottom pb-2 mb-4">
+                <i class="bi bi-folder2-open me-2 text-primary"></i>{{ tag }}
+            </h2>
+            
+            {% for ep in endpoints %}
+            <div class="card endpoint-card shadow-sm mb-4 method-{{ ep.method|lower }}">
+                <div class="card-body">
+                    <!-- Header: Method & URL -->
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge badge-{{ ep.method|lower }} font-outfit fw-bold px-3 py-2 text-uppercase fs-6">
+                                {{ ep.method }}
+                            </span>
+                            <code class="fs-5 text-dark fw-bold">{{ ep.path }}</code>
+                        </div>
+                        <span class="small text-muted">{{ ep.summary }}</span>
+                    </div>
+
+                    <p class="text-muted small mb-4">{{ ep.description }}</p>
+
+                    <!-- Parameters Section -->
+                    {% if ep.parameters %}
+                    <h5 class="h6 fw-bold font-outfit text-dark mb-2">Request Parameters</h5>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm table-bordered align-middle small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Located In</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for param in ep.parameters %}
+                                <tr>
+                                    <td><code>{{ param.name }}</code></td>
+                                    <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ param.in }}</span></td>
+                                    <td>
+                                        {% if param.required %}
+                                        <span class="text-danger fw-bold">Yes</span>
+                                        {% else %}
+                                        <span class="text-muted">No</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ param.description or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    <!-- Schema & Examples Section -->
+                    <div class="row">
+                        <!-- Request Example -->
+                        {% if ep.requestBody %}
+                        <div class="col-md-6 mb-3">
+                            <h5 class="h6 fw-bold font-outfit text-dark mb-2">Example Request Body</h5>
+                            {% set content = ep.requestBody.get('content', {}) %}
+                            {% set app_json = content.get('application/json', {}) %}
+                            {% set schema = app_json.get('schema', {}) %}
+                            <pre class="mb-0">{% if schema %}{{ schema | tojson(indent=2) }}{% else %}{}{% endif %}</pre>
+                        </div>
+                        {% endif %}
+
+                        <!-- Response Example -->
+                        {% if ep.responses %}
+                        <div class="col-md-{% if ep.requestBody %}6{% else %}12{% endif %} mb-3">
+                            <h5 class="h6 fw-bold font-outfit text-dark mb-2">Success Response (200/201)</h5>
+                            {% set resp_ok = ep.responses.get('200') or ep.responses.get('201') %}
+                            {% set resp_content = resp_ok.get('content', {}) if resp_ok else {} %}
+                            {% set resp_json = resp_content.get('application/json', {}) if resp_content else {} %}
+                            {% set resp_example = resp_json.get('example') if resp_json else None %}
+                            
+                            <pre class="mb-0">{% if resp_example %}{{ resp_example | tojson(indent=2) }}{% else %}{ "message": "Operation successful." }{% endif %}</pre>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}ReDoc Spec View - ExpenseWise{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="font-outfit fw-bold mb-1">API Reference Spec</h1>
+            <p class="text-muted mb-0">Clean three-pane structured REST API reference</p>
+        </div>
+        <a href="{{ url_for('dashboard.api_docs') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Docs
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 rounded-3 overflow-hidden mb-4">
+    <div class="card-body p-0" style="min-height: 600px;">
+        <div id="redoc-container"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- ReDoc standalone JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/redoc@2.0.0-rc.77/bundles/redoc.standalone.js"></script>
+<script>
+    Redoc.init('/static/openapi.json', {
+        scrollYOffset: 50,
+        hideDownloadButton: true,
+        theme: {
+            colors: {
+                primary: {
+                    main: '#0d6efd'
+                }
+            }
+        }
+    }, document.getElementById('redoc-container'));
+</script>
+{% endblock %}

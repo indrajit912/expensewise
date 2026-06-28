@@ -21,6 +21,7 @@ class User(db.Model, UserMixin):
     is_active = db.Column(db.Boolean, default=False, nullable=False) # Defaults to False for registration verification
     is_email_verified = db.Column(db.Boolean, default=False, nullable=False)
     default_currency = db.Column(db.String(10), nullable=False, default='INR')
+    timezone = db.Column(db.String(50), nullable=False, default='UTC')  # IANA timezone identifier (e.g., 'Asia/Kolkata')
     
     # End-to-End Encryption Columns
     encrypted_fernet_key = db.Column(db.Text, nullable=False)
@@ -30,6 +31,12 @@ class User(db.Model, UserMixin):
     # Administrator Roles
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     is_super_admin = db.Column(db.Boolean, default=False, nullable=False)
+    can_create_custom_api_tokens = db.Column(db.Boolean, default=False, nullable=False)
+
+    @property
+    def can_create_custom_tokens(self):
+        """Returns True if the user is an admin, superadmin, or has custom token permissions."""
+        return self.is_admin or self.is_super_admin or self.can_create_custom_api_tokens
 
     # Security/Lockout Columns
     failed_login_attempts = db.Column(db.Integer, default=0, nullable=False)
@@ -146,7 +153,7 @@ class User(db.Model, UserMixin):
                 
         db.session.commit()
 
-    def generate_token(self, expires_in_days=30):
+    def generate_token(self, expires_in_days=1):
         """Generates a secure API token and saves it in the database."""
         token_str = secrets.token_urlsafe(32)
         expiration = datetime.now(timezone.utc) + timedelta(days=expires_in_days)

@@ -249,20 +249,22 @@
                 <li class="mb-2"><i class="bi bi-check2 text-primary me-2"></i> <strong>Dynamic Budgeting</strong>: Compare budgets vs actual spending, retrieve averages, and update targets straight from your shell.</li>
             </ul>
             <div class="d-flex gap-2">
-                <a href="#cli-setup-details" class="btn btn-primary btn-sm px-3 py-2" onclick="document.getElementById('cli-setup-details').scrollIntoView({behavior: 'smooth'})">Get Started with CLI</a>
-                <a href="{{ url_for('dashboard.settings') }}#api-integrations-section" class="btn btn-outline-secondary btn-sm px-3 py-2">Get API Token</a>
+                <a href="#cli-setup-details" class="btn btn-primary btn-sm px-3 py-2" onclick="document.getElementById('cli-setup-details').scrollIntoView({behavior: 'smooth'})"><i class="bi bi-terminal me-1"></i> Get Started with CLI</a>
+                <a href="{{ url_for('dashboard.api_docs') }}" class="btn btn-outline-primary btn-sm px-3 py-2">
+                    <i class="bi bi-code-slash me-1"></i> API Reference Docs
+                </a>
             </div>
         </div>
         <div class="col-md-6" id="cli-setup-details">
             <div class="bg-dark text-light p-4 rounded-3 shadow font-monospace fs-7 border border-secondary border-opacity-25" style="box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;">
-                <div class="text-secondary"># Clone from GitHub</div>
-                <div class="text-primary">$ <span class="text-light">git clone https://github.com/indrajit912/expensewise.git</span></div>
+                <div class="text-secondary"># Install from GitHub</div>
+                <div class="text-primary">$ <span class="text-light">pip install git+https://github.com/indrajit912/expensewise.git</span></div>
                 
                 <div class="text-secondary mt-3"># Install CLI from source</div>
                 <div class="text-primary">$ <span class="text-light">cd expensewise/cli && pip install -e .</span></div>
                 
-                <div class="text-secondary mt-3"># Authenticate using your web API token</div>
-                <div class="text-primary">$ <span class="text-light">expensewise-cli token-login &lt;your_api_token&gt;</span></div>
+                <div class="text-secondary mt-3"># Authenticate securely (interactive password/token)</div>
+                <div class="text-primary">$ <span class="text-light">expensewise-cli login</span></div>
                 
                 <div class="text-secondary mt-3"># Show current month's budget allowance tracker</div>
                 <div class="text-primary">$ <span class="text-light">expensewise-cli budget-show</span></div>

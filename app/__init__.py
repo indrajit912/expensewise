@@ -201,6 +201,39 @@ def create_app(config_name=None):
             parts = val_str.split('.')
             return Markup(f"{parts[0]}<span style='font-size: 0.75em;'>.{parts[1]}</span>")
         return val_str
+    
+    # Timezone conversion template filters
+    @app.template_filter('to_user_tz')
+    def to_user_tz(dt_utc, user_timezone='UTC'):
+        """Convert UTC datetime to user timezone."""
+        from app.services.timezone_service import TimezoneService
+        if dt_utc is None:
+            return None
+        return TimezoneService.convert_to_user_timezone(dt_utc, user_timezone)
+    
+    @app.template_filter('format_tz_datetime')
+    def format_tz_datetime(dt_utc, user_timezone='UTC', fmt='%b %d, %Y at %I:%M %p'):
+        """Format UTC datetime in user's timezone."""
+        from app.services.timezone_service import TimezoneService
+        if dt_utc is None:
+            return 'N/A'
+        return TimezoneService.format_datetime_for_user(dt_utc, user_timezone, fmt)
+    
+    @app.template_filter('format_tz_date')
+    def format_tz_date(dt_utc, user_timezone='UTC', fmt='%b %d, %Y'):
+        """Format UTC datetime as date in user's timezone."""
+        from app.services.timezone_service import TimezoneService
+        if dt_utc is None:
+            return 'N/A'
+        return TimezoneService.format_date_for_user(dt_utc, user_timezone, fmt)
+    
+    @app.context_processor
+    def inject_user_timezone():
+        """Inject current user's timezone into templates."""
+        from flask_login import current_user
+        if current_user and current_user.is_authenticated:
+            return {'user_timezone': current_user.timezone}
+        return {'user_timezone': 'UTC'}
         
     # Register CLI Commands
     from app.cli import bootstrap_system_command, create_admin_command, create_guest_command, setup_project_command

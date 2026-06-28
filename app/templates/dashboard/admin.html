@@ -152,6 +152,7 @@
                             <th>User Details</th>
                             <th>Status</th>
                             <th>Role</th>
+                            <th>Custom Tokens</th>
                             <th>Registration Date</th>
                             <th class="text-end">Actions</th>
                         </tr>
@@ -192,7 +193,22 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <small class="text-muted">{{ user.date_joined.strftime('%b %d, %Y') }}</small>
+                                {% if user.is_admin or user.is_super_admin or user.username == 'ghostrix' %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1" title="Enabled automatically by administrator role">
+                                        <i class="bi bi-patch-check-fill"></i> Enabled (Admin)
+                                    </span>
+                                {% elif user.can_create_custom_api_tokens %}
+                                    <span class="badge bg-success text-white rounded-pill px-3 py-1">
+                                        <i class="bi bi-check-circle"></i> Enabled
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3 py-1">
+                                        Disabled
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ user.date_joined|format_tz_date(current_user.timezone, '%b %d, %Y') }}</small>
                             </td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
@@ -234,6 +250,25 @@
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-sm btn-outline-primary" title="Promote to Admin">
                                                 Promote
+                                            </button>
+                                        </form>
+                                    {% endif %}
+
+                                    <!-- Custom Token Permission -->
+                                    {% if user.is_super_admin or user.is_admin or user.username == 'ghostrix' %}
+                                        <!-- Protected -->
+                                    {% elif user.can_create_custom_api_tokens %}
+                                        <form method="POST" action="{{ url_for('dashboard.admin_toggle_custom_tokens', user_id=user.id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Revoke Custom API Lifetime Permission">
+                                                <i class="bi bi-key-fill"></i> Revoke Custom
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <form method="POST" action="{{ url_for('dashboard.admin_toggle_custom_tokens', user_id=user.id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Grant Custom API Lifetime Permission">
+                                                <i class="bi bi-key-fill"></i> Grant Custom
                                             </button>
                                         </form>
                                     {% endif %}
@@ -292,7 +327,7 @@
                         {% for log in audit_logs %}
                         <tr>
                             <td class="text-nowrap small text-muted">
-                                {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                {{ log.created_at|format_tz_datetime(current_user.timezone, '%Y-%m-%d %H:%M:%S') }}
                             </td>
                             <td>
                                 {% if log.user %}

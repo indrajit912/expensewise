@@ -70,10 +70,6 @@ def api_list_expenses():
     sort_by = request.args.get('sort_by', 'expense_date')
     order = request.args.get('order', 'desc')
 
-    # Load all user expenses (decryption occurs dynamically in Python on properties read)
-    all_expenses = Expense.query.filter_by(user_id=g.current_user.id).all()
-    filtered_items = []
-
     # Parse date filters
     start_date = None
     if start_date_str:
@@ -88,27 +84,13 @@ def api_list_expenses():
         except ValueError:
             pass
 
-    for e in all_expenses:
-        try:
-            if category and e.category != category:
-                continue
-
-            e_date = e.expense_date
-            if start_date and e_date < start_date:
-                continue
-            if end_date and e_date > end_date:
-                continue
-
-            if search_query:
-                q = search_query.lower()
-                desc = (e.description or '').lower()
-                payee = (e.payee or '').lower()
-                if q not in desc and q not in payee:
-                    continue
-
-            filtered_items.append(e)
-        except Exception:
-            continue
+    filtered_items = Expense.get_filtered_expenses(
+        user_id=g.current_user.id,
+        category=category,
+        start_date=start_date,
+        end_date=end_date,
+        search_query=search_query
+    )
 
     # Sort
     if sort_by == 'amount':

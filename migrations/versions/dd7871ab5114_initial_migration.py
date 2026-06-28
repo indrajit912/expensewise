@@ -1,8 +1,8 @@
 """Initial migration
 
-Revision ID: 33ccc4a86d2b
+Revision ID: dd7871ab5114
 Revises: 
-Create Date: 2026-06-28 13:10:40.389904
+Create Date: 2026-06-28 18:47:34.913623
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '33ccc4a86d2b'
+revision = 'dd7871ab5114'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -29,11 +29,13 @@ def upgrade():
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('is_email_verified', sa.Boolean(), nullable=False),
     sa.Column('default_currency', sa.String(length=10), nullable=False),
+    sa.Column('timezone', sa.String(length=50), nullable=False),
     sa.Column('encrypted_fernet_key', sa.Text(), nullable=False),
     sa.Column('server_encrypted_fernet_key', sa.Text(), nullable=True),
     sa.Column('kdf_salt', sa.LargeBinary(), nullable=False),
     sa.Column('is_admin', sa.Boolean(), nullable=False),
     sa.Column('is_super_admin', sa.Boolean(), nullable=False),
+    sa.Column('can_create_custom_api_tokens', sa.Boolean(), nullable=False),
     sa.Column('failed_login_attempts', sa.Integer(), nullable=False),
     sa.Column('lockout_until', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id')

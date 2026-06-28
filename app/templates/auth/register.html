@@ -26,35 +26,35 @@
                                 {% endfor %}
                             </div>
                         {% else %}
-                            {{ form.name(class="form-control", placeholder="John Doe") }}
+                            {{ form.name(class="form-control", placeholder="Riya Sarkar") }}
                         {% endif %}
                     </div>
 
                     <div class="mb-3">
                         {{ form.username.label(class="form-label") }}
                         {% if form.username.errors %}
-                            {{ form.username(class="form-control is-invalid", placeholder="username123") }}
+                            {{ form.username(class="form-control is-invalid", placeholder="aegon24") }}
                             <div class="invalid-feedback">
                                 {% for error in form.username.errors %}
                                     <span>{{ error }}</span>
                                 {% endfor %}
                             </div>
                         {% else %}
-                            {{ form.username(class="form-control", placeholder="username123") }}
+                            {{ form.username(class="form-control", placeholder="aegon24") }}
                         {% endif %}
                     </div>
 
                     <div class="mb-3">
                         {{ form.email.label(class="form-label") }}
                         {% if form.email.errors %}
-                            {{ form.email(class="form-control is-invalid", placeholder="you@example.com") }}
+                            {{ form.email(class="form-control is-invalid", placeholder="riyasarkar@example.com") }}
                             <div class="invalid-feedback">
                                 {% for error in form.email.errors %}
                                     <span>{{ error }}</span>
                                 {% endfor %}
                             </div>
                         {% else %}
-                            {{ form.email(class="form-control", placeholder="you@example.com") }}
+                            {{ form.email(class="form-control", placeholder="riyasarkar@example.com") }}
                         {% endif %}
                         <div class="form-text text-muted">We will never share your email with third parties.</div>
                     </div>
@@ -72,6 +72,37 @@
                             {{ form.default_currency(class="form-select") }}
                         {% endif %}
                     </div>
+
+                    <div class="mb-3">
+                        {{ form.timezone.label(class="form-label") }}
+                        <div class="input-group">
+                            {% if form.timezone.errors %}
+                                {{ form.timezone(class="form-select is-invalid", id="timezone-select") }}
+                                <div class="invalid-feedback">
+                                    {% for error in form.timezone.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                {{ form.timezone(class="form-select", id="timezone-select") }}
+                            {% endif %}
+                        </div>
+                        <div class="form-text text-muted">Select your timezone for accurate time display throughout the app.</div>
+                    </div>
+
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const timezoneSelect = document.getElementById('timezone-select');
+                            if (timezoneSelect) {
+                                // Try to auto-detect timezone
+                                const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                                const options = Array.from(timezoneSelect.options).map(o => o.value);
+                                if (detectedTz && options.includes(detectedTz)) {
+                                    timezoneSelect.value = detectedTz;
+                                }
+                            }
+                        });
+                    </script>
 
                     <div class="row mb-4">
                         <div class="col-md-6 mb-3 mb-md-0">

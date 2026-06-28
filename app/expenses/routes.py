@@ -2,7 +2,7 @@ import os
 import uuid
 import json
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, Response, session
 from flask_login import login_required, current_user
 from app.extensions import db
@@ -68,11 +68,6 @@ def list_expenses():
     sort_by = request.args.get('sort_by', 'expense_date')
     order = request.args.get('order', 'desc')
 
-    # Fetch all user expenses (since date/categories are encrypted in DB, we must filter in Python)
-    from datetime import timedelta
-    all_expenses = Expense.query.filter_by(user_id=current_user.id).all()
-    filtered_items = []
-
     # Parse date filters
     start_date = None
     if start_date_str:
@@ -87,31 +82,15 @@ def list_expenses():
         except ValueError:
             pass
 
-    for e in all_expenses:
-        try:
-            # 1. Category Filter
-            if category_filter and e.category != category_filter:
-                continue
-
-            # 2. Date Filter
-            e_date = e.expense_date
-            if start_date and e_date < start_date:
-                continue
-            if end_date and e_date > end_date:
-                continue
-
-            # 3. Search text filter (case-insensitive)
-            if search_query:
-                q = search_query.lower()
-                desc = (e.description or '').lower()
-                payee = (e.payee or '').lower()
-                if q not in desc and q not in payee:
-                    continue
-
-            filtered_items.append(e)
-        except Exception:
-            # Skip records if key is locked or decryption fails
-            continue
+    filtered_items = Expense.get_filtered_expenses(
+        user_id=current_user.id,
+        category=category_filter,
+        start_date=start_date,
+        end_date=end_date,
+        search_query=search_query
+    )
+    
+    all_expenses = Expense.query.filter_by(user_id=current_user.id).all()
 
     # =========================================================================
     #                   ANALYTICS & INSIGHTS CALCULATIONS

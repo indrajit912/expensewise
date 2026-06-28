@@ -3,6 +3,7 @@ from wtforms import StringField, PasswordField, BooleanField, SubmitField, Selec
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 import re
 from app.models.user import User
+from app.services.timezone_service import TimezoneService
 
 def validate_password_complexity(form, field):
     """Utility validator to enforce strong passwords."""
@@ -48,6 +49,7 @@ class RegisterForm(FlaskForm):
         ('AUD', 'AUD (A$)'),
         ('CAD', 'CAD (C$)')
     ], validators=[DataRequired()], default='INR')
+    timezone = SelectField('Timezone', validators=[DataRequired()], default='UTC')
     submit = SubmitField('Create Account')
 
     def validate_email(self, field):
@@ -81,3 +83,9 @@ class ResetPasswordForm(FlaskForm):
         EqualTo('password', message='Passwords must match.')
     ])
     submit = SubmitField('Reset Password')
+
+
+def populate_timezone_choices(form):
+    """Populate timezone field with IANA timezone choices."""
+    timezone_list = TimezoneService.get_timezone_list()
+    form.timezone.choices = [(tz, tz) for tz in timezone_list]

@@ -156,6 +156,39 @@ class Expense(db.Model):
             'updated_at': self.updated_at.isoformat()
         }
 
+    @staticmethod
+    def get_filtered_expenses(user_id, category=None, start_date=None, end_date=None, search_query=None):
+        """Retrieves and filters user expenses in-memory securely (handles encrypted fields)."""
+        all_expenses = Expense.query.filter_by(user_id=user_id).all()
+        filtered = []
+        for e in all_expenses:
+            try:
+                # 1. Category Filter (case-insensitive)
+                if category:
+                    e_cat = e.category
+                    if not e_cat or e_cat.lower() != category.lower():
+                        continue
+
+                # 2. Date range filter
+                e_date = e.expense_date
+                if start_date and e_date < start_date:
+                    continue
+                if end_date and e_date > end_date:
+                    continue
+
+                # 3. Search query filter (case-insensitive payee/description check)
+                if search_query:
+                    q = search_query.lower()
+                    desc = (e.description or '').lower()
+                    payee = (e.payee or '').lower()
+                    if q not in desc and q not in payee:
+                        continue
+
+                filtered.append(e)
+            except Exception:
+                continue
+        return filtered
+
     def __repr__(self):
         try:
             return f"<Expense {self.category} - {self.amount} on {self.expense_date}>"

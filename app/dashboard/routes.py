@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, abort, current_app
 from flask_login import login_required, current_user
 from datetime import datetime, timezone, timedelta
@@ -8,6 +9,7 @@ from app.models.user import User, APIToken, AuditLog
 from app.models.expense import Expense, Category, PaymentMethod
 from app.services.analytics_service import AnalyticsService
 from app.services.audit_service import AuditService
+from app.services.timezone_service import TimezoneService
 
 dashboard = Blueprint('dashboard', __name__, template_folder='templates')
 
@@ -127,7 +129,20 @@ def settings():
 
         # Token Actions
         elif action == 'generate_token':
-            token_str = current_user.generate_token(expires_in_days=30)
+            expires_in_days = 1
+            if current_user.can_create_custom_tokens:
+                custom_days_str = request.form.get('expires_in_days', '').strip()
+                if custom_days_str:
+                    try:
+                        custom_days = int(custom_days_str)
+                        if custom_days < 1 or custom_days > 365:
+                            flash("Lifespan must be between 1 and 365 days.", "danger")
+                            return redirect(url_for('dashboard.settings'))
+                        expires_in_days = custom_days
+                    except ValueError:
+                        flash("Invalid lifespan value. Please enter a valid integer.", "danger")
+                        return redirect(url_for('dashboard.settings'))
+            token_str = current_user.generate_token(expires_in_days=expires_in_days)
             session['new_token'] = token_str
             
             # Cache decrypted key for API token auth
@@ -385,6 +400,27 @@ def settings():
                 flash("Default currency updated. Historical transactions remain unmodified.", "success")
                 
             return redirect(url_for('dashboard.settings'))
+        
+        # Timezone Update Action
+        elif action == 'update_timezone':
+            new_timezone = request.form.get('timezone', '').strip()
+            
+            if not TimezoneService.is_valid_timezone(new_timezone):
+                flash("Invalid timezone selected.", "danger")
+                return redirect(url_for('dashboard.settings'))
+            
+            old_timezone = current_user.timezone
+            
+            if old_timezone == new_timezone:
+                flash("Timezone was not changed.", "info")
+                return redirect(url_for('dashboard.settings'))
+            
+            current_user.timezone = new_timezone
+            db.session.commit()
+            AuditService.log("Timezone Settings Update", f"Changed timezone from {old_timezone} to {new_timezone}")
+            flash(f"Timezone updated to {new_timezone}. All timestamps will now display in your local timezone.", "success")
+            
+            return redirect(url_for('dashboard.settings'))
 
     return render_template(
         'dashboard/settings.html', 
@@ -498,6 +534,27 @@ def admin_reactivate_user(user_id):
     
     AuditService.log("User Reactivation", f"Reactivated account for user {user.email}", user_id=current_user.id)
     flash(f"User account for '{user.name}' has been reactivated successfully.", "success")
+    return redirect(url_for('dashboard.admin_panel'))
+
+
+@dashboard.route('/admin/user/<user_id>/toggle-custom-tokens', methods=['POST'])
+@login_required
+def admin_toggle_custom_tokens(user_id):
+    """Grants or revokes permission to create custom API token lifetimes for a user."""
+    if not current_user.is_admin:
+        abort(403)
+        
+    user = User.query.get_or_404(user_id)
+    if user.is_super_admin or user.is_admin or user.username == 'ghostrix':
+        flash('Administrator accounts automatically have custom API token lifetime permissions.', 'info')
+        return redirect(url_for('dashboard.admin_panel'))
+        
+    user.can_create_custom_api_tokens = not user.can_create_custom_api_tokens
+    db.session.commit()
+    
+    state = "Granted" if user.can_create_custom_api_tokens else "Revoked"
+    AuditService.log("Permission Toggle", f"{state} custom API token permission for user {user.email}", user_id=current_user.id)
+    flash(f"Custom API token lifetime permission has been {state.lower()} for '{user.name}'.", "success")
     return redirect(url_for('dashboard.admin_panel'))
 
 
@@ -761,3 +818,58 @@ def budget():
         total_spent=total_spent,
         months_history=months_history
     )
+
+
+@dashboard.route('/docs')
+def api_docs():
+    """Renders the comprehensive in-app API developer portal and documentation."""
+    openapi_path = os.path.join(current_app.root_path, 'static', 'openapi.json')
+    openapi_data = {}
+    if os.path.exists(openapi_path):
+        try:
+            with open(openapi_path, 'r', encoding='utf-8') as f:
+                openapi_data = json.load(f)
+        except Exception:
+            pass
+            
+    paths = openapi_data.get('paths', {})
+    grouped_endpoints = {}
+    
+    for path, methods_dict in paths.items():
+        for method, details in methods_dict.items():
+            tags = details.get('tags', ['General'])
+            tag = tags[0] if tags else 'General'
+            
+            endpoint_info = {
+                'path': path,
+                'method': method.upper(),
+                'summary': details.get('summary', ''),
+                'description': details.get('description', ''),
+                'parameters': details.get('parameters', []),
+                'requestBody': details.get('requestBody', {}),
+                'responses': details.get('responses', {}),
+                'security': details.get('security', [])
+            }
+            
+            if tag not in grouped_endpoints:
+                grouped_endpoints[tag] = []
+            grouped_endpoints[tag].append(endpoint_info)
+            
+    default_currency = current_user.default_currency if current_user.is_authenticated else 'USD'
+    return render_template(
+        'dashboard/api_docs.html',
+        grouped_endpoints=grouped_endpoints,
+        default_currency=default_currency
+    )
+
+
+@dashboard.route('/docs/swagger')
+def api_swagger():
+    """Renders the interactive Swagger UI interface referencing openapi.json."""
+    return render_template('dashboard/swagger.html')
+
+
+@dashboard.route('/docs/redoc')
+def api_redoc():
+    """Renders the modern ReDoc documentation viewer referencing openapi.json."""
+    return render_template('dashboard/redoc.html')

@@ -135,6 +135,64 @@ def api_verify_otp():
         return jsonify({'error': 'Unauthorized', 'message': f'Incorrect OTP. Attempts remaining: {attempts_left}'}), 401
 
 
+@api.route('/v1/auth/resend-otp', methods=['POST'])
+def api_resend_otp():
+    """Generates and sends a new registration OTP code via API."""
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    email = data.get('email')
+
+    if not user_id and not email:
+        return jsonify({'error': 'Bad Request', 'message': 'Provide user_id or email.'}), 400
+
+    user = None
+    if user_id:
+        user = User.query.get(user_id)
+    else:
+        user = User.query.filter_by(email=email.strip().lower()).first()
+
+    if not user:
+        return jsonify({'error': 'Not Found', 'message': 'User account not found.'}), 404
+
+    # Enforce security requirements 1 & 2
+    if user.is_email_verified:
+        return jsonify({'error': 'Bad Request', 'message': 'This account is already verified.'}), 400
+
+    # Requirement 5: Rate Limiting
+    existing_otp = UserOTP.query.filter_by(user_id=user.id).first()
+    if existing_otp:
+        time_elapsed = datetime.now(timezone.utc) - existing_otp.created_at.replace(tzinfo=timezone.utc)
+        if time_elapsed.total_seconds() < 60:
+            seconds_to_wait = int(60 - time_elapsed.total_seconds())
+            return jsonify({
+                'error': 'Too Many Requests',
+                'message': f'Please wait {seconds_to_wait} seconds before requesting another verification code.'
+            }), 429
+
+    # Invalidate previous OTPs (Requirement 3)
+    if existing_otp:
+        db.session.delete(existing_otp)
+
+    # Create fresh OTP (Requirement 4)
+    otp = f"{random.randint(100000, 999999)}"
+    otp_hash = generate_password_hash(otp)
+    
+    otp_entry = UserOTP(
+        user_id=user.id,
+        otp_hash=otp_hash,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5)
+    )
+    db.session.add(otp_entry)
+    db.session.commit()
+    
+    try:
+        EmailService.send_otp_email(user.email, otp)
+    except Exception:
+        pass
+        
+    return jsonify({'message': 'A fresh verification OTP has been sent to your email address.'}), 200
+
+
 @api.route('/v1/auth/login', methods=['POST'])
 def api_login():
     """Endpoint to exchange user credentials for an API authorization token."""
@@ -161,6 +219,22 @@ def api_login():
         return jsonify({'error': 'Locked', 'message': f'Account locked due to consecutive failures. Try again in {minutes_left} minutes.'}), 423
 
     if user.check_password(password):
+        if not user.is_email_verified:
+            # Check if OTP has expired
+            otp_entry = UserOTP.query.filter_by(user_id=user.id).first()
+            expired = not otp_entry or otp_entry.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc)
+            
+            message = 'Your email address has not yet been verified.'
+            if expired:
+                message += ' Your previous verification code has expired.'
+                
+            return jsonify({
+                'error': 'Unverified',
+                'message': message,
+                'user_id': user.id,
+                'email': user.email
+            }), 403
+            
         if not user.is_active:
             return jsonify({'error': 'Unauthorized', 'message': 'This account has not been activated.'}), 401
 
@@ -186,8 +260,31 @@ def api_login():
         db.session.commit()
 
         # Generate token
+        expires_in_days = 1
+        custom_days = data.get('expires_in_days')
+        if custom_days is not None:
+            try:
+                custom_days_val = int(custom_days)
+                if custom_days_val != 1:
+                    if not user.can_create_custom_tokens:
+                        return jsonify({
+                            'error': 'Forbidden',
+                            'message': 'You do not have permission to specify a custom API token lifetime.'
+                        }), 403
+                    if custom_days_val < 1 or custom_days_val > 365:
+                        return jsonify({
+                            'error': 'Bad Request',
+                            'message': 'Token lifespan must be between 1 and 365 days.'
+                        }), 400
+                    expires_in_days = custom_days_val
+            except (ValueError, TypeError):
+                return jsonify({
+                    'error': 'Bad Request',
+                    'message': 'Lifespan must be a valid integer.'
+                }), 400
+
         try:
-            token_str = user.generate_token(expires_in_days=30)
+            token_str = user.generate_token(expires_in_days=expires_in_days)
             token_obj = APIToken.query.filter_by(token=token_str).first()
             
             # Store decrypted key in cache keyed by token

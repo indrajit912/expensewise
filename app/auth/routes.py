@@ -5,10 +5,11 @@ from datetime import datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash
 from app.extensions import db
 from app.models.user import User, UserOTP
-from app.auth.forms import LoginForm, RegisterForm, ResetPasswordRequestForm, ResetPasswordForm
+from app.auth.forms import LoginForm, RegisterForm, ResetPasswordRequestForm, ResetPasswordForm, populate_timezone_choices
 from app.services.email_service import EmailService
 from app.services.encryption_service import EncryptionService
 from app.services.audit_service import AuditService
+from app.services.timezone_service import TimezoneService
 
 auth = Blueprint('auth', __name__, template_folder='templates')
 
@@ -19,13 +20,26 @@ def register():
         return redirect(url_for('dashboard.index'))
     
     form = RegisterForm()
+    
+    # Populate timezone choices
+    if request.method == 'GET':
+        populate_timezone_choices(form)
+    
     if form.validate_on_submit():
+        # Validate timezone
+        if not TimezoneService.is_valid_timezone(form.timezone.data):
+            flash('Invalid timezone selected. Defaulting to UTC.', 'warning')
+            timezone_value = 'UTC'
+        else:
+            timezone_value = form.timezone.data
+        
         # Account is initialized inactive (is_active=False) until OTP verification is completed
         user = User(
             name=form.name.data,
             username=form.username.data.lower().strip(),
             email=form.email.data.lower().strip(),
-            default_currency=form.default_currency.data
+            default_currency=form.default_currency.data,
+            timezone=timezone_value
         )
         user.set_password(form.password.data)
         
@@ -72,6 +86,10 @@ def verify_otp():
     if not user:
         flash('User not found. Please register again.', 'danger')
         return redirect(url_for('auth.register'))
+
+    if user.is_email_verified:
+        flash('Your email is already verified. Please log in.', 'info')
+        return redirect(url_for('auth.login'))
 
     if request.method == 'POST':
         entered_otp = request.form.get('otp', '').strip()
@@ -138,9 +156,24 @@ def resend_otp():
     if not user:
         flash('User not found. Please register again.', 'danger')
         return redirect(url_for('auth.register'))
+
+    # Security Requirement: Verified accounts should not trigger this
+    if user.is_email_verified:
+        flash('This account is already verified. Please log in.', 'info')
+        return redirect(url_for('auth.login'))
         
-    # Delete old OTP entry
-    UserOTP.query.filter_by(user_id=user.id).delete()
+    # Rate Limiting (e.g. 60 seconds interval)
+    existing_otp = UserOTP.query.filter_by(user_id=user.id).first()
+    if existing_otp:
+        time_elapsed = datetime.now(timezone.utc) - existing_otp.created_at.replace(tzinfo=timezone.utc)
+        if time_elapsed.total_seconds() < 60:
+            seconds_to_wait = int(60 - time_elapsed.total_seconds())
+            flash(f'Please wait {seconds_to_wait} seconds before requesting another verification code.', 'warning')
+            return redirect(url_for('auth.verify_otp'))
+            
+    # Delete old OTP entry (Invalidate previous)
+    if existing_otp:
+        db.session.delete(existing_otp)
     
     # Create fresh OTP
     otp = f"{random.randint(100000, 999999)}"
@@ -186,11 +219,26 @@ def login():
                 minutes_left = (seconds_left // 60) + 1
                 flash(f'Account locked due to consecutive failures. Try again in {minutes_left} minutes.', 'danger')
                 return redirect(url_for('auth.login'))
-
+ 
             if user.check_password(form.password.data):
+                # 2. Check if account email has been verified
+                if not user.is_email_verified:
+                    session['verify_user_id'] = user.id
+                    
+                    # Determine if previous verification code has expired
+                    otp_entry = UserOTP.query.filter_by(user_id=user.id).first()
+                    expired = not otp_entry or otp_entry.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc)
+                    
+                    if expired:
+                        flash('Your email address has not yet been verified, and your previous verification code has expired. Please verify your email or request a new OTP.', 'warning')
+                    else:
+                        flash('Your email address has not yet been verified. Please enter the verification code sent to your email.', 'info')
+                        
+                    return redirect(url_for('auth.verify_otp'))
+                    
                 # Account status checks
                 if not user.is_active:
-                    flash('This account is disabled. Please verify your email or contact support.', 'danger')
+                    flash('This account is disabled. Please contact support.', 'danger')
                     return redirect(url_for('auth.login'))
                     
                 # 2. Derive key and decrypt data Fernet key

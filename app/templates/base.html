@@ -60,7 +60,12 @@
                     {% endif %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'expenses.import_backup' %}active{% endif %}" href="{{ url_for('expenses.import_backup') }}">
-                            <i class="bi bi-cloud-arrow-up me-1"></i> Backup/Restore
+                            <i class="bi bi-cloud-arrow-up me-1"></i> Backup
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint.startswith('dashboard.api_') %}active{% endif %}" href="{{ url_for('dashboard.api_docs') }}">
+                            <i class="bi bi-code-slash me-1"></i> API Docs
                         </a>
                     </li>
                     {% endif %}

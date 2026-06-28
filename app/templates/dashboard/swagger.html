@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Swagger API Console - ExpenseWise{% endblock %}
+
+{% block extra_head %}
+<!-- Swagger UI CSS -->
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+<style>
+    /* Clean overrides for native look and feel */
+    .swagger-ui .topbar { display: none; }
+    .swagger-ui { background: white; padding: 20px; border-radius: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row pt-4 mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="font-outfit fw-bold mb-1">API Testing Console</h1>
+            <p class="text-muted mb-0">Test and inspect live REST API endpoints interactively</p>
+        </div>
+        <a href="{{ url_for('dashboard.api_docs') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Docs
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 rounded-3 overflow-hidden mb-4">
+    <div class="card-body p-0">
+        <div id="swagger-ui"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Swagger UI JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+<script>
+    window.onload = function() {
+        const ui = SwaggerUIBundle({
+            url: "/static/openapi.json",
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIBundle.presets.swaggerUiConfig,
+                SwaggerUIStandalonePreset
+            ],
+            layout: "BaseLayout",
+            persistAuthorization: true
+        });
+        window.ui = ui;
+    };
+</script>
+{% endblock %}

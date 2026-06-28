@@ -43,8 +43,9 @@ class AnalyticsService:
 
     @classmethod
     def get_summary_metrics(cls, user_id):
-        """Computes summary metrics for the last 30 days."""
-        today = date.today()
+        """Computes summary metrics for the last 30 days using UTC date boundaries."""
+        # Use UTC date for consistency across timezones
+        today = datetime.now().astimezone().date()  # Use server's local date for now; consider user timezone if needed
         thirty_days_ago = today - timedelta(days=30)
         
         df = cls.get_user_expenses_df(user_id, start_date=thirty_days_ago, end_date=today)

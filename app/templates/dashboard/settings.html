@@ -13,7 +13,7 @@
 <!-- Staged API Token display card -->
 {% if new_token %}
 <div class="card border-warning bg-warning-subtle shadow-sm p-4 mb-4 rounded-3 text-dark position-relative">
-    <button type="button" class="btn-close position-absolute top-0 end-0 m-3" onclick="this.parentElement.parentElement.remove()" aria-label="Close" title="Dismiss card"></button>
+    <button type="button" class="btn-close position-absolute top-0 end-0 m-3" onclick="this.parentElement.remove()" aria-label="Close" title="Dismiss card"></button>
     <div class="card-body p-0">
         <h3 class="h6 fw-bold font-outfit text-warning-emphasis mb-2">
             <i class="bi bi-exclamation-triangle-fill me-1"></i>Copy Your Generated API Token
@@ -67,14 +67,14 @@
             
             <div class="mb-3 border-bottom pb-2">
                 <label class="text-secondary small fw-semibold text-uppercase">Date Joined</label>
-                <div class="text-dark">{{ current_user.date_joined.strftime('%b %d, %Y') }}</div>
+                <div class="text-dark">{{ current_user.date_joined|format_tz_datetime(current_user.timezone, '%b %d, %Y at %I:%M %p') }} <span class="text-muted small">({{ current_user.timezone }})</span></div>
             </div>
             
             <div class="mb-3 pb-2">
                 <label class="text-secondary small fw-semibold text-uppercase">Last Login Session</label>
                 <div class="text-dark">
                     {% if current_user.last_login %}
-                        {{ current_user.last_login.strftime('%b %d, %Y at %I:%M %p') }}
+                        {{ current_user.last_login|format_tz_datetime(current_user.timezone, '%b %d, %Y at %I:%M %p') }} <span class="text-muted small">({{ current_user.timezone }})</span>
                     {% else %}
                         Current Session
                     {% endif %}
@@ -156,24 +156,121 @@
                     <button type="submit" class="btn btn-primary" id="btn-save-currency">Save Currency Settings</button>
                 </div>
             </form>
+
+            <hr class="my-4">
+
+            <!-- Timezone Settings Form -->
+            <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="update_timezone">
+                
+                <div class="mb-3">
+                    <label for="settings-timezone-select" class="form-label fw-semibold">Timezone</label>
+                    <select name="timezone" id="settings-timezone-select" class="form-select">
+                        {# Timezone options will be populated by JavaScript #}
+                    </select>
+                </div>
+                
+                <div class="alert alert-info alert-sm py-2 px-3 mb-3" style="font-size: 0.875rem;">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>All timestamps displayed</strong> will be automatically converted from UTC to <span id="selected-tz-display">{{ current_user.timezone }}</span>.
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">Save Timezone Settings</button>
+                </div>
+            </form>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const timezoneSelect = document.getElementById('settings-timezone-select');
+                    const timezoneDisplay = document.getElementById('selected-tz-display');
+                    
+                    // List of all IANA timezones (simplified - you can make this more comprehensive)
+                    const timezones = [
+                        // Asia
+                        'Asia/Kolkata', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Hong_Kong', 'Asia/Bangkok',
+                        'Asia/Singapore', 'Asia/Dubai', 'Asia/Karachi', 'Asia/Jakarta', 'Asia/Manila',
+                        'Asia/Seoul', 'Asia/Taipei',
+                        // Europe
+                        'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid', 'Europe/Amsterdam',
+                        'Europe/Rome', 'Europe/Athens', 'Europe/Moscow', 'Europe/Istanbul', 'Europe/Lisbon',
+                        // Americas
+                        'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+                        'America/Toronto', 'America/Vancouver', 'America/Mexico_City', 'America/Sao_Paulo',
+                        'America/Buenos_Aires', 'America/Caracas',
+                        // Pacific
+                        'Pacific/Auckland', 'Pacific/Sydney', 'Pacific/Fiji', 'Pacific/Honolulu',
+                        // Africa
+                        'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos', 'Africa/Nairobi',
+                        'Africa/Casablanca',
+                        // UTC
+                        'UTC', 'Etc/UTC'
+                    ].sort();
+                    
+                    const currentTz = '{{ current_user.timezone }}';
+                    
+                    // Populate timezone options
+                    timezones.forEach(tz => {
+                        const option = document.createElement('option');
+                        option.value = tz;
+                        option.textContent = tz;
+                        option.selected = (tz === currentTz);
+                        timezoneSelect.appendChild(option);
+                    });
+                    
+                    // Update display when selection changes
+                    timezoneSelect.addEventListener('change', function() {
+                        timezoneDisplay.textContent = this.value;
+                    });
+                });
+            </script>
         </div>
     </div>
 
     <!-- API Token Control Card -->
     <div class="col-md-7">
         <div class="card glass-card border-0 bg-white p-4 shadow-sm h-100">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3 class="h5 fw-bold font-outfit mb-0"><i class="bi bi-code-slash text-primary me-2"></i>Developer API Keys</h3>
-                <form method="POST" action="">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" name="action" value="generate_token" class="btn btn-sm btn-primary">
-                        <i class="bi bi-plus-circle me-1"></i> Generate Key
-                    </button>
-                </form>
-            </div>
-            <p class="text-muted small mb-4">
+            <h3 class="h5 fw-bold font-outfit mb-3"><i class="bi bi-code-slash text-primary me-2"></i>Developer API Keys</h3>
+            <p class="text-muted small mb-3">
                 Use these security tokens to integrate the ExpenseWise terminal CLI or pull JSON data feeds from external apps. Keep them secret.
             </p>
+
+            <!-- API Token Generation Form -->
+            <div class="card bg-light border-0 p-3 mb-4 rounded-3">
+                <form method="POST" action="" class="row align-items-end g-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="generate_token">
+                    
+                    {% if current_user.can_create_custom_tokens %}
+                    <div class="col-sm-8 col-md-7">
+                        <label for="expires_in_days" class="form-label small fw-semibold mb-1">Token Lifespan (Days)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" min="1" max="365" name="expires_in_days" id="expires_in_days" class="form-control" value="1" placeholder="1">
+                            <span class="input-group-text">days</span>
+                        </div>
+                        <div class="form-text text-muted small mt-1" style="font-size: 0.75rem;">
+                            Allowable limit: 1 to 365 days. Default: 1 day.
+                        </div>
+                    </div>
+                    <div class="col-sm-4 col-md-5 text-end">
+                        <button type="submit" class="btn btn-sm btn-primary w-100 py-2">
+                            <i class="bi bi-plus-circle me-1"></i> Generate Key
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="col-12 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+                        <div class="text-muted small" style="font-size: 0.8rem;">
+                            <i class="bi bi-info-circle me-1 text-primary"></i> 
+                            Standard tokens expire in <strong>1 day</strong>. Custom lifetimes (up to 365 days) are restricted. Contact an administrator to request access.
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary py-2 px-3 flex-shrink-0">
+                            <i class="bi bi-plus-circle me-1"></i> Generate (1 Day)
+                        </button>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
 
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
@@ -195,8 +292,8 @@
                                             {{ tok.token[:8] }}...{{ tok.token[-4:] if tok.token|length > 12 else '' }}
                                         </code>
                                     </td>
-                                    <td class="small">{{ tok.created_at.strftime('%Y-%m-%d') }}</td>
-                                    <td class="small">{{ tok.expires_at.strftime('%Y-%m-%d') }}</td>
+                                    <td class="small">{{ tok.created_at|format_tz_date(current_user.timezone, '%Y-%m-%d') }}</td>
+                                    <td class="small">{{ tok.expires_at|format_tz_date(current_user.timezone, '%Y-%m-%d') }}</td>
                                     <td>
                                         {% if tok.is_valid %}
                                             <span class="badge bg-success-subtle text-success">Active</span>
@@ -287,7 +384,7 @@
                                         </div>
                                     </td>
                                     <td class="small text-muted">
-                                        {{ cat.created_at.strftime('%b %d, %Y') if cat.created_at else 'N/A' }}
+                                        {{ cat.created_at|format_tz_date(current_user.timezone, '%b %d, %Y') if cat.created_at else 'N/A' }}
                                     </td>
                                     <td class="small text-center fw-bold text-secondary">
                                         {{ category_counts.get(cat.name, 0) }}
@@ -373,7 +470,7 @@
                                         </div>
                                     </td>
                                     <td class="small text-muted">
-                                        {{ pm.created_at.strftime('%b %d, %Y') if pm.created_at else 'N/A' }}
+                                        {{ pm.created_at|format_tz_date(current_user.timezone, '%b %d, %Y') if pm.created_at else 'N/A' }}
                                     </td>
                                     <td class="small text-center fw-bold text-secondary">
                                         {{ payment_method_counts.get(pm.name, 0) }}

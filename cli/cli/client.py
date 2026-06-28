@@ -1,24 +1,115 @@
 import os
 import json
 import requests
-
-DEFAULT_API_URL = os.environ.get('EXPENSEWISE_API_URL', 'http://127.0.0.1:5000/api')
+import keyring
 
 class APIClient:
     """Client wrapper to interact with the ExpenseWise REST API."""
 
     def __init__(self, api_url=None):
-        self.api_url = (api_url or DEFAULT_API_URL).rstrip('/')
         self.token_file_path = os.path.expanduser('~/.expensewise/auth.json')
+        if api_url:
+            self._api_url = api_url.rstrip('/')
+        else:
+            self._api_url = None
+
+    @property
+    def config_file_path(self):
+        return os.path.expanduser('~/.expensewise/config.json')
+
+    @property
+    def api_url(self):
+        if hasattr(self, '_api_url') and self._api_url:
+            return self._api_url
+        return self.load_config_url()
+
+    def load_config_url(self):
+        """Resolves the active API URL based on priority rules."""
+        # 1. Environment Override
+        env_url = os.environ.get('EXPENSEWISE_API_URL')
+        if env_url:
+            return env_url.rstrip('/')
+            
+        # 2. Stored Local Config
+        if os.path.exists(self.config_file_path):
+            try:
+                with open(self.config_file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    stored_url = data.get('api_url')
+                    if stored_url:
+                        return stored_url.rstrip('/')
+            except Exception:
+                pass
+                
+        # 3. Default Fallback
+        return 'http://localhost:5000/api'
+
+    def save_config_url(self, url):
+        """Saves the API URL to local configuration storage."""
+        os.makedirs(os.path.dirname(self.config_file_path), exist_ok=True)
+        try:
+            config_data = {}
+            if os.path.exists(self.config_file_path):
+                try:
+                    with open(self.config_file_path, 'r', encoding='utf-8') as f:
+                        config_data = json.load(f)
+                except Exception:
+                    pass
+                
+            config_data['api_url'] = url
+            with open(self.config_file_path, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2)
+            try:
+                os.chmod(self.config_file_path, 0o600)
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
+
+    def reset_config_url(self):
+        """Resets the configured API URL by removing it from local storage."""
+        if os.path.exists(self.config_file_path):
+            try:
+                config_data = {}
+                try:
+                    with open(self.config_file_path, 'r', encoding='utf-8') as f:
+                        config_data = json.load(f)
+                except Exception:
+                    pass
+                if 'api_url' in config_data:
+                    del config_data['api_url']
+                with open(self.config_file_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=2)
+                return True
+            except Exception:
+                pass
+        return False
 
     def save_token(self, token):
-        """Saves authentication token to secure user configuration file."""
-        os.makedirs(os.path.dirname(self.token_file_path), exist_ok=True)
-        with open(self.token_file_path, 'w', encoding='utf-8') as f:
-            json.dump({'token': token}, f)
+        """Saves authentication token securely using OS keyring, falling back to secure file."""
+        try:
+            keyring.set_password("expensewise", "api_token", token)
+        except Exception:
+            # Secure fallback to file
+            os.makedirs(os.path.dirname(self.token_file_path), exist_ok=True)
+            with open(self.token_file_path, 'w', encoding='utf-8') as f:
+                json.dump({'token': token}, f)
+            try:
+                os.chmod(self.token_file_path, 0o600)
+            except Exception:
+                pass
 
     def load_token(self):
-        """Loads authentication token if it exists."""
+        """Loads authentication token from keyring or fallback file."""
+        try:
+            token = keyring.get_password("expensewise", "api_token")
+            if token:
+                return token
+        except Exception:
+            pass
+
+        # Fallback file check
         if not os.path.exists(self.token_file_path):
             return None
         try:
@@ -29,7 +120,12 @@ class APIClient:
             return None
 
     def clear_token(self):
-        """Invalidates and deletes local authentication token file."""
+        """Deletes local authentication credentials from keyring and files."""
+        try:
+            keyring.delete_password("expensewise", "api_token")
+        except Exception:
+            pass
+
         if os.path.exists(self.token_file_path):
             try:
                 os.remove(self.token_file_path)
@@ -105,15 +201,25 @@ class APIClient:
         url = f"{self.api_url}/v1/expenses/{uuid_str}"
         return requests.delete(url, headers=self.get_headers())
 
-    def get_analytics_summary(self):
-        """Retrieves rollups and comparative changes."""
+    def get_analytics_summary(self, category='', start_date='', end_date=''):
+        """Retrieves rollups and comparative changes with filters."""
         url = f"{self.api_url}/v1/analytics/summary"
-        return requests.get(url, headers=self.get_headers())
+        params = {
+            'category': category,
+            'start_date': start_date,
+            'end_date': end_date
+        }
+        return requests.get(url, params=params, headers=self.get_headers())
 
-    def get_analytics_trends(self):
-        """Retrieves category distributions and histories."""
+    def get_analytics_trends(self, category='', start_date='', end_date=''):
+        """Retrieves category distributions and histories with filters."""
         url = f"{self.api_url}/v1/analytics/trends"
-        return requests.get(url, headers=self.get_headers())
+        params = {
+            'category': category,
+            'start_date': start_date,
+            'end_date': end_date
+        }
+        return requests.get(url, params=params, headers=self.get_headers())
 
     def get_analytics_forecast(self):
         """Retrieves forecasts and regression predictions."""

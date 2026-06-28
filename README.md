@@ -210,32 +210,108 @@ pip install .
 
 Once installed via any method above, the CLI tool is globally available in your environment via the `expensewise-cli` executable.
 
-### Configuration
-By default, the CLI connects to the local development environment at `http://127.0.0.1:5000/api`. To point the CLI to a remote deployment (e.g. PythonAnywhere production instance), configure the `EXPENSEWISE_API_URL` environment variable:
-```bash
-# Windows PowerShell
-$env:EXPENSEWISE_API_URL="https://expensewise.pythonanywhere.com/api"
+### Updating the CLI
 
-# Linux/macOS
-export EXPENSEWISE_API_URL="https://expensewise.pythonanywhere.com/api"
+To update to the latest version from GitHub:
+
+#### For Option 1 (Direct GitHub Installation):
+```bash
+pip install --upgrade git+https://github.com/indrajit912/expensewise.git#subdirectory=cli
 ```
 
+#### For Option 2 & 3 (Local Repository):
+Navigate to the `cli` directory and upgrade:
+```bash
+pip install --upgrade .
+```
+
+Or in editable mode:
+```bash
+pip install --upgrade -e .
+```
+
+### Configuration
+By default, the CLI connects to the local development environment at `http://localhost:5000/api`. To point the CLI to a remote deployment (e.g. PythonAnywhere production instance), you can configure a persistent local URL or use an environment variable override.
+
+The CLI resolves the API Server URL using the following priority order:
+1. **Environment Variable Override** (Highest priority, temporary override for the active shell session)
+2. **Local Configuration File** (Stored in `~/.expensewise/config.json`)
+3. **Default Fallback**: `http://localhost:5000/api`
+
+#### Managing the Server URL via the CLI
+
+* **View active server URL and resolution source:**
+  ```bash
+  expensewise-cli config show
+  ```
+
+* **Set a persistent API server URL:**
+  ```bash
+  expensewise-cli config set-url https://expensewise.pythonanywhere.com/api
+  ```
+
+* **Reset server URL to the default (http://localhost:5000/api):**
+  ```bash
+  expensewise-cli config reset
+  ```
+
+* **Temporary environment override:**
+  ```bash
+  # Windows PowerShell
+  $env:EXPENSEWISE_API_URL="https://expensewise.pythonanywhere.com/api"
+
+  # Linux/macOS
+  export EXPENSEWISE_API_URL="https://expensewise.pythonanywhere.com/api"
+  ```
+
+### Account Registration & Self-Service Email Verification
+
+When registering a new account, a 6-digit One-Time Password (OTP) is sent to the registered email address. This verification code has a validity lifetime of **5 minutes**.
+
+* **Self-Service Verification Recovery Flow:** If your verification code expires before you enter it, or if you close the registration screen, you can complete email verification at any time:
+  1. Simply log in with your email/username and password.
+  2. If the account is unverified, the system will redirect you to the **Verify Account** page.
+  3. If your previous OTP has expired, you will see a notice stating that the code has expired.
+  4. Click the **Resend Verification OTP** button to generate a new 5-minute code, which is instantly sent to your email.
+* **Rate Limiting Security:** To prevent abuse, OTP regeneration requests are rate-limited to a **60-second cooldown** interval.
+* **API Endpoint:** Unverified API/CLI client logins receive a `403 Forbidden` response containing the user details. You can request a new verification OTP by calling `/api/v1/auth/resend-otp` with JSON payload `{"email": "your_email@example.com"}`.
+
 ### Obtaining an API Token & Authentication
-To log in without sharing your credentials over terminal streams, you can use a web-generated API token:
-1. Log in to the web interface.
-2. Navigate to **Settings** and scroll down to the **API Token** section.
-3. Click **Generate New Token** and copy the resulting hash.
-4. Run the following command to link the CLI:
-   ```bash
-   expensewise-cli token-login <YOUR_COPIED_TOKEN>
-   ```
-Alternatively, you can authenticate directly with your registration email and password:
+To log in securely, run:
 ```bash
 expensewise-cli login
 ```
-To sign out and delete local keys, run:
+This prompts you to choose between:
+1. **Email & Password**: Direct credential authentication.
+2. **API Token**: Secure token entry (non-echoed interactive password prompt).
+
+Alternatively, you can securely configure or update a token directly using:
 ```bash
+expensewise-cli auth token
+```
+
+#### API Token Lifetimes & Permissions
+
+By default, newly generated API tokens expire in **1 day** for standard users. This minimizes credential leakage window sizes on personal environments.
+
+* **Custom Token Lifespans:** Users with the `can_create_custom_api_tokens` capability, or accounts possessing **Admin** / **Super Admin** roles, can configure custom API token lifespans (between **1 and 365 days**) during generation.
+* **Administrator Workflow:** Administrators can grant or revoke the custom API token lifetime permission for any regular user account directly from the **Admin Panel** (`/admin`). Toggling this option instantly updates the user's Settings form inputs and enforces lifecycle parameters on the backend REST controller.
+
+#### Secure Storage Backend
+To follow security best practices, `expensewise-cli` automatically integrates with your operating system's secure credential/keyring manager (e.g., Windows Credential Manager or macOS Keychain via the `keyring` package). If no secure keyring is available, it falls back to writing the token to a secure file at `~/.expensewise/auth.json` initialized with restricted read/write permissions (`chmod 600`).
+
+To check the current authentication status (without revealing the full token), run:
+```bash
+expensewise-cli auth status
+```
+
+To sign out and permanently delete all local credential configurations, run:
+```bash
+# Clear local credentials only (default, stored token remains valid on the server)
 expensewise-cli logout
+
+# Clear local credentials AND revoke/delete the token on the server
+expensewise-cli logout --revoke
 ```
 
 ### Command Reference & Examples
@@ -314,15 +390,31 @@ expensewise-cli logout
   expensewise-cli import-backup backup.json
   ```
 
-#### Terminal Spending Visual Charts
-Generate colorful terminal-based spending charts that map distributions across categories using Unicode bar representations:
-```bash
-expensewise-cli chart
-```
-*Supports date and category level parameters:*
-```bash
-expensewise-cli chart --start-date=2026-06-01 --end-date=2026-06-30
-```
+#### Terminal Spending Summaries & Visual Charts
+Display spending summaries, rolling financial indicators, and forecast projections, or generate category allocation bar charts in the terminal:
+
+* **Show spending summary over a date range:**
+  ```bash
+  expensewise-cli summary --start-date=2026-01-01 --end-date=2026-05-31
+  ```
+  *Displays total spending, transaction count, average transaction, and daily average.*
+
+* **Show category-wise breakdown table and share chart:**
+  ```bash
+  expensewise-cli summary --category-wise --start-date=2026-01-01 --end-date=2026-05-31
+  ```
+
+* **Display rolling 30-day indicators, comparisons, and forecasts (Default summary view):**
+  ```bash
+  expensewise-cli summary
+  ```
+  *(Note: The backward-compatible command alias `expensewise-cli analytics` can be used interchangeably.)*
+
+* **Generate category allocation bar charts:**
+  ```bash
+  expensewise-cli chart
+  expensewise-cli chart --start-date=2026-06-01 --end-date=2026-06-30
+  ```
 
 ### Visual Chart Mockup
 ```text
@@ -339,41 +431,100 @@ expensewise-cli chart --start-date=2026-06-01 --end-date=2026-06-30
 
 ## 8. REST API Documentation
 
-All request and response payloads exchange JSON structures. Set `Authorization: Bearer <ACCESS_TOKEN>` on restricted routes.
+ExpenseWise provides a versioned, developer-friendly REST API for custom client integrations, shell scripting, or data analysis.
 
-### Summary Endpoints Map
+### API Overview
+* **Base URL:** `/api` (e.g. `http://localhost:5000/api` or `https://expensewise.pythonanywhere.com/api`)
+* **Protocol:** HTTPS (Enforced on production servers)
+* **Payload Format:** JSON for all request bodies and responses
+* **In-App Interactive Docs:** Fully integrated interactive API docs are served at the following routes (access requires login):
+  * **Interactive developer guide:** `/docs` (collapsible cards and schemas)
+  * **Swagger UI test console:** `/docs/swagger` (lets you test endpoints directly from the browser)
+  * **ReDoc reference sheet:** `/docs/redoc` (structured 3-pane reference layout)
+
+### Authentication
+Secure routes require an API Access Token passed in the HTTP headers. You can generate and copy these tokens from the **Settings & API Token** section in your profile dropdown.
+
+**Header Format:**
+```http
+Authorization: Bearer <YOUR_API_TOKEN>
+Content-Type: application/json
+```
+
+### Endpoints Summary Reference
 
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
-| **POST** | `/api/v1/auth/register` | Create a new user profile | No |
-| **POST** | `/api/v1/auth/verify-otp`| Verify email registration OTP | No |
-| **POST** | `/api/v1/auth/login` | Exchange credentials for API Access Token | No |
-| **POST** | `/api/v1/auth/logout` | Revoke the active session token | Yes |
-| **GET** | `/api/v1/expenses` | Query paginated list of user expenses | Yes |
-| **POST** | `/api/v1/expenses` | Save a new expense record | Yes |
-| **GET** | `/api/v1/expenses/<uuid>` | Fetch details of a single record | Yes |
+| **POST** | `/api/v1/auth/register` | Create a new user profile (triggers verification OTP) | No |
+| **POST** | `/api/v1/auth/verify-otp`| Verify email registration OTP to activate account | No |
+| **POST** | `/api/v1/auth/resend-otp`| Request a fresh verification OTP for unverified account | No |
+| **POST** | `/api/v1/auth/login` | Exchange credentials for a Bearer access token | No |
+| **POST** | `/api/v1/auth/logout` | Revoke/delete the active session token on the server | Yes |
+| **GET** | `/api/v1/expenses` | Query paginated lists of expenses with search & date filters | Yes |
+| **POST** | `/api/v1/expenses` | Save a new expense entry (payload encrypted on disk) | Yes |
+| **GET** | `/api/v1/expenses/<uuid>` | Fetch full details of a single expense record | Yes |
 | **PUT** | `/api/v1/expenses/<uuid>` | Edit details of a record | Yes |
 | **DELETE**| `/api/v1/expenses/<uuid>` | Delete a record | Yes |
-| **GET** | `/api/v1/categories` | List user custom categories | Yes |
-| **POST** | `/api/v1/categories` | Add custom category | Yes |
-| **GET** | `/api/v1/payment-methods` | List user payment channels | Yes |
-| **GET** | `/api/v1/analytics/summary`| Fetch summary sums and averages | Yes |
-| **GET** | `/api/v1/export` | Backup the user database to JSON v2.0 | Yes |
-| **POST** | `/api/v1/import` | Restore the user database from JSON v2.0 | Yes |
+| **GET** | `/api/v1/categories` | List user custom category definitions and colors | Yes |
+| **POST** | `/api/v1/categories` | Add a new custom category | Yes |
+| **GET** | `/api/v1/payment-methods` | List custom payment modes | Yes |
+| **GET** | `/api/v1/analytics/summary`| Fetch range-filtered totals, daily averages, and category lists | Yes |
+| **GET** | `/api/v1/analytics/trends` | Fetch category allocations data | Yes |
+| **GET** | `/api/v1/export` | Backup the database to JSON v2.0 | Yes |
+| **POST** | `/api/v1/import` | Restore/merge the database from JSON v2.0 | Yes |
 
-### Example cURL Command: Save Expense
+---
+
+### Example Integrations
+
+#### 1. Save a New Expense (cURL Command)
 ```bash
-curl -X POST http://127.0.0.1:5000/api/v1/expenses \
+curl -X POST http://localhost:5000/api/v1/expenses \
   -H "Authorization: Bearer YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "amount": 1250.75,
     "category": "Shopping",
     "expense_date": "2026-06-28",
-    "payee": "Amazon India",
+    "payee": "Amazon",
     "payment_mode": "Credit Card",
     "description": "Office supplies"
   }'
+```
+
+#### 2. Fetch Spending Averages over Date Range (Python script)
+```python
+import requests
+
+api_url = "http://localhost:5000/api/v1/analytics/summary"
+token = "YOUR_API_TOKEN"
+
+headers = {
+    "Authorization": f"Bearer {token}",
+    "Content-Type": "application/json"
+}
+
+params = {
+    "start_date": "2026-01-01",
+    "end_date": "2026-05-31",
+    "category-wise": "true"
+}
+
+res = requests.get(api_url, headers=headers, params=params)
+if res.status_code == 200:
+    data = res.json()
+    metrics = data.get("metrics", {})
+    print(f"Total Spent: {metrics.get('total_spending')}")
+    print(f"Daily Average: {metrics.get('daily_average')}")
+    for cat in data.get("categories", []):
+        print(f" - {cat['category']}: {cat['total']} ({cat['pct']}%)")
+else:
+    print(f"Error {res.status_code}: {res.text}")
+```
+
+#### 3. CLI Client Equivalent
+```bash
+expensewise-cli summary --start-date 2026-01-01 --end-date 2026-05-31 --category-wise
 ```
 
 ---

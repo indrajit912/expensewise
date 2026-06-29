@@ -242,10 +242,10 @@ SUBCOMMAND_EXAMPLES = {
         "  # Updates password for authenticated account. Securely confirms current and new values."
     ),
     'encryption': (
-        "  expensewise-cli encryption\n"
-        "  # Displays current End-to-End Encryption preference status.\n\n"
-        "  expensewise-cli encryption off\n"
-        "  # Disables encryption mode, prompting with trade-offs and executing data decryption migration."
+        "  expensewise-cli encryption --status\n"
+        "  # Displays whether encryption is currently enabled or disabled.\n\n"
+        "  expensewise-cli encryption --change-status\n"
+        "  # Toggles the current encryption status (migrates all transaction data)."
     ),
     'profile': (
         "  expensewise-cli profile\n"
@@ -826,9 +826,10 @@ def logout(revoke):
 
 
 @cli.command(name='encryption', cls=CustomHelpCommand)
-@click.argument('status', type=click.Choice(['on', 'off', 'enable', 'disable'], case_sensitive=False), required=False)
+@click.option('--status', is_flag=True, help='Display whether encryption is currently enabled or disabled.')
+@click.option('--change-status', is_flag=True, help='Toggle the current encryption status.')
 @click.pass_context
-def manage_encryption(ctx, status):
+def manage_encryption(ctx, status, change_status):
     """View or configure End-to-End Encryption (E2E) preference."""
     token = client.load_token()
     if not token:
@@ -843,53 +844,51 @@ def manage_encryption(ctx, status):
     data = res.json()
     current_enabled = data.get('encryption_enabled', True)
     
-    if status is None:
-        status_str = "[bold green]ENABLED (E2E)[/]" if current_enabled else "[bold yellow]DISABLED (Plaintext)[/]"
-        console.print(f"\n[bold cyan]End-to-End Data Encryption Preference[/]")
-        console.print(f"Current Status: {status_str}\n")
-        console.print("To change this preference, run:")
-        console.print("  [green]expensewise-cli encryption [on|off][/]")
+    # Default to status if no options are supplied
+    if not status and not change_status:
+        status = True
+        
+    if status:
+        status_str = "ENABLED" if current_enabled else "DISABLED"
+        console.print(f"Encryption is currently {status_str}.")
         return
         
-    target_enabled = status.lower() in ['on', 'enable']
-    if target_enabled == current_enabled:
-        status_str = "enabled" if target_enabled else "disabled"
-        console.print(f"[yellow]Info:[/] Encryption is already {status_str} for your account.")
-        return
-
-    # Print trade-offs
-    console.print("\n[bold cyan]=== Encryption Preference Change Request ===[/]\n")
-    console.print("[bold]When E2E Encryption is Enabled (Recommended):[/]")
-    console.print("  [green]✅[/] Your data is encrypted before being stored in the database.")
-    console.print("  [green]✅[/] Provides maximum privacy and security.")
-    console.print("  [red]❌[/] Reading and writing data may be slightly slower due to encryption and decryption overhead.")
-    console.print("")
-    console.print("[bold]When E2E Encryption is Disabled:[/]")
-    console.print("  [green]✅[/] Faster application performance and quicker page/API responses.")
-    console.print("  [green]✅[/] Reduced CPU overhead during data access.")
-    console.print("  [red]❌[/] Your data is stored in plaintext in the database and no longer benefits from end-to-end encryption.")
-    console.print("")
-    console.print("[bold yellow]Important Notice:[/]")
-    console.print("  * Encryption is enabled by default for all users.")
-    console.print("  * Disabling encryption is recommended only if you understand the associated privacy trade-offs.")
-    console.print("")
-    
-    action_str = "ENABLE" if target_enabled else "DISABLE"
-    prompt_msg = f"Are you sure you want to {action_str} End-to-End Encryption and migrate your data?"
-    if not click.confirm(prompt_msg, default=False):
-        console.print("[yellow]Operation cancelled by user.[/]")
-        return
+    if change_status:
+        target_enabled = not current_enabled
         
-    console.print(f"\nUpdating encryption preference to: [bold]{'ENABLED' if target_enabled else 'DISABLED'}[/]...")
-    console.print("[yellow]Migrating all transaction records. This may take a moment...[/]")
-    
-    res = client.update_profile(encryption_enabled=target_enabled)
-    if res.status_code == 200:
-        new_status_str = "[bold green]ENABLED[/]" if target_enabled else "[bold yellow]DISABLED (Plaintext)[/]"
-        console.print(f"[bold green]Success![/] Data encryption preference updated to {new_status_str} and records migrated successfully.\n")
-    else:
-        err = res.json().get('message') or res.json().get('error') or "Unknown error"
-        console.print(f"[bold red]Failed to update encryption settings:[/] {err}")
+        # Print trade-offs
+        console.print("\n[bold cyan]=== Encryption Preference Change Request ===[/]\n")
+        console.print("[bold]When E2E Encryption is Enabled (Recommended):[/]")
+        console.print("  [green]✅[/] Your data is encrypted before being stored in the database.")
+        console.print("  [green]✅[/] Provides maximum privacy and security.")
+        console.print("  [red]❌[/] Reading and writing data may be slightly slower due to encryption and decryption overhead.")
+        console.print("")
+        console.print("[bold]When E2E Encryption is Disabled:[/]")
+        console.print("  [green]✅[/] Faster application performance and quicker page/API responses.")
+        console.print("  [green]✅[/] Reduced CPU overhead during data access.")
+        console.print("  [red]❌[/] Your data is stored in plaintext in the database and no longer benefits from end-to-end encryption.")
+        console.print("")
+        console.print("[bold yellow]Important Notice:[/]")
+        console.print("  * Encryption is enabled by default for all users.")
+        console.print("  * Disabling encryption is recommended only if you understand the associated privacy trade-offs.")
+        console.print("")
+        
+        action_str = "ENABLE" if target_enabled else "DISABLE"
+        prompt_msg = f"Are you sure you want to {action_str} End-to-End Encryption and migrate your data?"
+        if not click.confirm(prompt_msg, default=False):
+            console.print("[yellow]Operation cancelled by user.[/]")
+            return
+            
+        console.print(f"\nUpdating encryption preference to: [bold]{'ENABLED' if target_enabled else 'DISABLED'}[/]...")
+        console.print("[yellow]Migrating all transaction records. This may take a moment...[/]")
+        
+        res = client.update_profile(encryption_enabled=target_enabled)
+        if res.status_code == 200:
+            new_status_str = "ENABLED" if target_enabled else "DISABLED"
+            console.print(f"Encryption has been {new_status_str}.")
+        else:
+            err = res.json().get('message') or res.json().get('error') or "Unknown error"
+            console.print(f"[bold red]Failed to update encryption settings:[/] {err}")
 
 
 @cli.command(cls=CustomHelpCommand)

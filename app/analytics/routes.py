@@ -30,10 +30,14 @@ def index():
     today = date.today()
     start_date = today.replace(day=1) - timedelta(days=30 * (months - 1))
     start_date = start_date.replace(day=1) 
-    category_dist = AnalyticsService.get_category_distribution(user_id=user_id, start_date=start_date, end_date=today)
+    category_breakdown = AnalyticsService.get_category_breakdown(user_id=user_id, start_date=start_date, end_date=today)
+    category_dist = {item['category']: item['total_amount'] for item in category_breakdown}
     
     # 4. Predict spending for the next month
     forecast_spending = AnalyticsService.predict_next_month_spending(user_id)
+    
+    # 5. Get spending patterns by day of week & time of month
+    spending_patterns = AnalyticsService.get_spending_patterns(user_id=user_id, start_date=start_date, end_date=today)
     
     # Separate history dictionary into lists for Chart.js rendering
     history_months = list(history.keys())
@@ -45,6 +49,8 @@ def index():
         history_amounts=history_amounts,
         comp_metrics=comp_metrics,
         category_dist=category_dist,
+        category_breakdown=category_breakdown,
+        spending_patterns=spending_patterns,
         forecast_spending=forecast_spending,
         selected_months=months
     )
@@ -89,5 +95,75 @@ def get_trends_over_time_json():
             moving_average_window=moving_average_window
         )
         return jsonify(trends), 200
+    except Exception as e:
+        return jsonify({'error': 'Server Error', 'message': str(e)}), 500
+
+
+@analytics.route('/api/category-breakdown')
+@login_required
+def get_category_breakdown_json():
+    """Returns JSON category breakdown for AJAX frontend requests."""
+    user_id = current_user.id
+    
+    start_date_str = request.args.get('start_date', '').strip()
+    end_date_str = request.args.get('end_date', '').strip()
+    
+    from datetime import datetime
+    start_date = None
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    end_date = None
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    try:
+        breakdown = AnalyticsService.get_category_breakdown(
+            user_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        return jsonify(breakdown), 200
+    except Exception as e:
+        return jsonify({'error': 'Server Error', 'message': str(e)}), 500
+
+
+@analytics.route('/api/spending-patterns')
+@login_required
+def get_spending_patterns_json():
+    """Returns JSON day-of-week and day-of-month spending patterns for AJAX frontend requests."""
+    user_id = current_user.id
+    
+    start_date_str = request.args.get('start_date', '').strip()
+    end_date_str = request.args.get('end_date', '').strip()
+    
+    from datetime import datetime
+    start_date = None
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    end_date = None
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    try:
+        patterns = AnalyticsService.get_spending_patterns(
+            user_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        return jsonify(patterns), 200
     except Exception as e:
         return jsonify({'error': 'Server Error', 'message': str(e)}), 500

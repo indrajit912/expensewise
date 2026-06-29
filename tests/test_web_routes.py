@@ -117,6 +117,27 @@ def test_analytics_route(client, test_user):
     assert 'labels' in json_data
     assert 'totals' in json_data
 
+    # 5. Test the web-authenticated JSON API category breakdown endpoint
+    response_breakdown = client.get('/analytics/api/category-breakdown')
+    assert response_breakdown.status_code == 200
+    assert response_breakdown.mimetype == 'application/json'
+    breakdown_data = response_breakdown.get_json()
+    assert isinstance(breakdown_data, list)
+
+    # 6. Test the web-authenticated JSON API spending patterns endpoint
+    response_patterns = client.get('/analytics/api/spending-patterns')
+    assert response_patterns.status_code == 200
+    assert response_patterns.mimetype == 'application/json'
+    patterns_data = response_patterns.get_json()
+    assert 'day_of_week' in patterns_data
+    assert 'time_of_month' in patterns_data
+    assert 'insights' in patterns_data
+
+    # 7. Test page rendering has spending patterns headers
+    response_page = client.get('/analytics/')
+    assert response_page.status_code == 200
+    assert b'Spending Patterns &amp; Insights' in response_page.data or b'Spending Patterns & Insights' in response_page.data
+
 
 def test_auth_reset_views(client, test_user):
     """Tests loading the password reset views."""

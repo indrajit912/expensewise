@@ -265,3 +265,75 @@ def api_analytics_trends_over_time():
         return jsonify(trends), 200
     except Exception as e:
         return jsonify({'error': 'Server Error', 'message': str(e)}), 500
+
+
+@api.route('/v1/analytics/category-breakdown', methods=['GET'])
+@token_required
+def api_analytics_category_breakdown():
+    """Endpoint returning category breakdown details."""
+    user_id = g.current_user.id
+    
+    from flask import request
+    from datetime import datetime
+    
+    start_date_str = request.args.get('start_date', '').strip()
+    end_date_str = request.args.get('end_date', '').strip()
+    
+    start_date = None
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    end_date = None
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    try:
+        breakdown = AnalyticsService.get_category_breakdown(user_id, start_date=start_date, end_date=end_date)
+        return jsonify({
+            'breakdown': breakdown,
+            'default_currency': g.current_user.default_currency
+        }), 200
+    except Exception as e:
+        return jsonify({'error': 'Server Error', 'message': str(e)}), 500
+
+
+@api.route('/v1/analytics/spending-patterns', methods=['GET'])
+@token_required
+def api_analytics_spending_patterns():
+    """Endpoint returning day-of-week and day-of-month spending patterns."""
+    user_id = g.current_user.id
+    
+    from flask import request
+    from datetime import datetime
+    
+    start_date_str = request.args.get('start_date', '').strip()
+    end_date_str = request.args.get('end_date', '').strip()
+    
+    start_date = None
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    end_date = None
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    try:
+        patterns = AnalyticsService.get_spending_patterns(user_id, start_date=start_date, end_date=end_date)
+        return jsonify({
+            'patterns': patterns,
+            'default_currency': g.current_user.default_currency
+        }), 200
+    except Exception as e:
+        return jsonify({'error': 'Server Error', 'message': str(e)}), 500

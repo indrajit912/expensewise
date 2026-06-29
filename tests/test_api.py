@@ -164,6 +164,26 @@ def test_api_analytics(client, app, test_user, api_headers):
     tot_daily = client.get('/api/v1/analytics/trends-over-time?interval=day', headers=api_headers)
     assert tot_daily.status_code == 200
 
+    # Test category breakdown endpoint
+    cbd_res = client.get('/api/v1/analytics/category-breakdown', headers=api_headers)
+    assert cbd_res.status_code == 200
+    cbd_data = cbd_res.get_json()
+    assert 'breakdown' in cbd_data
+    assert len(cbd_data['breakdown']) > 0
+    assert cbd_data['breakdown'][0]['category'] == 'Rent'
+    assert cbd_data['breakdown'][0]['total_amount'] == 400.0
+    assert cbd_data['breakdown'][0]['percentage'] == 100.0
+    assert cbd_data['breakdown'][0]['transaction_count'] == 1
+
+    # Test spending patterns endpoint
+    spp_res = client.get('/api/v1/analytics/spending-patterns', headers=api_headers)
+    assert spp_res.status_code == 200
+    spp_data = spp_res.get_json()
+    assert 'patterns' in spp_data
+    assert 'day_of_week' in spp_data['patterns']
+    assert 'time_of_month' in spp_data['patterns']
+    assert 'insights' in spp_data['patterns']
+
 
 def test_api_categories_and_payment_methods_crud(client, app, test_user, api_headers):
     """Tests categories and payment methods API endpoints and validation constraints."""

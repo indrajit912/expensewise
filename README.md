@@ -18,6 +18,7 @@
 
 1. [Project Overview](#1-project-overview)
 2. [Features & Walkthrough](#2-features--walkthrough)
+2.1. [Analytics Dashboard](#analytics-dashboard)
 3. [ExpenseWise CLI](#3-expensewise-cli)
 4. [REST API Documentation](#4-rest-api-documentation)
 5. [Local Development & Maintainer Guide](#5-local-development--maintainer-guide)
@@ -56,6 +57,7 @@ With ExpenseWise, users can:
 * **Intelligent Budget Planning:** Calculates 3-month category averages, provides inline target recommendations, and renders allowance indicators.
 * **Indian Number System Formatting:** Consistently groups digits in Indian standard format (`12,30,445.00`) across tables, summaries, and charts.
 * **Dashboard & Visual Analytics:** Real-time statistics, monthly variance indicators, interactive spending trend lines, and category distribution doughnuts.
+* **Analytics Dashboard:** Enhanced interactive visualizations including time-aggregated spending trends, moving-average overlays, interactive donut charts with percentage breakdowns, and automated behavioral insights.
 * **Custom Category/Payment Settings:** Create custom tags with unique hex colors, and access shortcuts from the Add Expense form.
 * **JSON Portability:** Safe JSON backup export/import module executing multi-stage integrity and validation schema checks before execution.
 * **Installable CLI Client:** Rich command-line client supporting registration, logging, list pagination, and summaries.
@@ -66,8 +68,39 @@ With ExpenseWise, users can:
 ![Main User Dashboard](docs/images/website/userdashboard.png)
 *Figure 2: The web dashboard displaying key metrics, daily spending visual trends, category breakdown charts, and current rolling summaries.*
 
-![Visual Analytics Dashboard](docs/images/website/analytics.png)
-*Figure 3: Spending analytics panel displaying historical budget variances and linear regression forecast trends.*
+
+
+## Analytics Dashboard
+
+The Analytics Dashboard provides developers and end users with a set of interactive visualizations and automated insights to explore spending behavior, compare category shares, and discover patterns over time.
+
+### Spending Trends Over Time
+
+- **Time-based aggregation:** View totals aggregated by Daily, Weekly, Monthly, or Yearly intervals.
+- **Moving average trend line:** Smooth short-term volatility with a configurable moving average overlay to reveal underlying direction.
+- **Interactive filtering:** Drill down by date ranges, categories, accounts, and payment modes using inline controls.
+- **"Learn about this chart":** Contextual help explaining axes, aggregations, and interpretation guidance is available directly from the chart header.
+
+### Category Breakdown & Top Spending Categories
+
+- **Interactive donut chart:** Click or hover to isolate a category and highlight related transactions across the timeline.
+- **Percentage breakdown by category:** Clear numeric percentage labels accompany the chart for quick comparisons.
+- **Top spending category insight:** The dashboard surfaces the highest-spend category with short-form commentary and quick actions (e.g., add budget, set alerts).
+- **Interactive legend and tooltips:** Legends toggle category visibility; tooltips show exact totals, counts, and percent share.
+
+![Spending Trends & Category Breakdown](docs/images/website/spending-trends-chart-pie.png)
+
+### Spending Behavioral Highlights
+
+- **Spending patterns by day of the week:** Heatmaps and summaries reveal which weekdays see the most activity.
+- **Spending patterns throughout the month:** Visualizations show concentration of spending early, mid, or late in each month.
+- **Automatically generated behavioral insights:** The system generates human-readable insights (e.g., “Most spending occurs on weekends in Food”) and flags surprising deviations.
+- **Interactive visualizations:** Clickable highlights let users jump from an insight to the filtered transaction list or create a budget rule.
+
+![Behavioral Spending Highlights](docs/images/website/spending-behavioral-highlights.png)
+
+For developers: analytics endpoints and data sources are exposed via the REST API (see [4. REST API Documentation](#4-rest-api-documentation)).
+
 
 ---
 

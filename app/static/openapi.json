@@ -504,6 +504,69 @@
         }
       }
     },
+    "/v1/analytics/category-breakdown": {
+      "get": {
+        "tags": ["Reports & Analytics"],
+        "summary": "Fetch category breakdown including total amount, percentage, and transaction count",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category breakdown.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "breakdown": [
+                    { "category": "Food", "total_amount": 320.65, "percentage": 66.0, "transaction_count": 5 },
+                    { "category": "Travel", "total_amount": 165.08, "percentage": 34.0, "transaction_count": 2 }
+                  ],
+                  "default_currency": "INR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics/spending-patterns": {
+      "get": {
+        "tags": ["Reports & Analytics"],
+        "summary": "Fetch day-of-week and day-of-month spending patterns",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Spending patterns.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "patterns": {
+                    "day_of_week": [
+                      { "day_name": "Monday", "total_spending": 150.0, "average_spending": 50.0, "transaction_count": 3, "top_category": "Food" }
+                    ],
+                    "time_of_month": [
+                      { "day_num": 1, "total_spending": 200.0, "average_spending": 100.0, "transaction_count": 2 }
+                    ],
+                    "insights": {
+                      "highest_spending_day": "Saturday",
+                      "lowest_spending_day": "Tuesday",
+                      "highest_spending_period": "Days 1-10"
+                    }
+                  },
+                  "default_currency": "INR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/export": {
       "get": {
         "tags": ["Import/Export"],

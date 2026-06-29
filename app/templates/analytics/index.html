@@ -144,8 +144,43 @@
     <!-- Doughnut Chart: Category allocation -->
     <div class="col-lg-5">
         <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
-            <h3 class="h5 fw-bold font-outfit mb-3">Category Distribution</h3>
-            <div class="chart-container d-flex align-items-center justify-content-center" style="position: relative; height: 300px;">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <h3 class="h5 fw-bold font-outfit mb-0">Category Distribution</h3>
+                    <button class="btn btn-link btn-sm text-decoration-none p-0 text-primary fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#learn-category-info" aria-expanded="false" aria-controls="learn-category-info" style="font-size: 0.85rem;">
+                        <i class="bi bi-info-circle-fill"></i> Learn about this chart
+                    </button>
+                </div>
+            </div>
+
+            <!-- Learn More Collapse Content -->
+            <div class="collapse mb-3" id="learn-category-info">
+                <div class="p-3 bg-light rounded-3 border border-light" style="color: #374151;">
+                    <h5 class="fw-bold font-outfit text-dark mb-2" style="font-size: 0.95rem;">
+                        <i class="bi bi-pie-chart-fill text-primary me-1"></i> Understanding Category Distribution
+                    </h5>
+                    <p class="small mb-2">
+                        This donut chart shows how your total expenses are distributed among categories during this period.
+                    </p>
+                    <ul class="small text-muted mb-0 ps-3">
+                        <li><strong class="text-dark">Percentage Calculation:</strong> Computed by dividing each category's total cost by your total spending across all categories, multiplied by 100.</li>
+                        <li><strong class="text-dark">How to use this:</strong> Look for disproportionately large categories. If non-essential categories account for a large percentage of your spending, they represent prime targets for reducing expenses.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Top Spending Category Insight Card -->
+            {% if category_breakdown %}
+                {% set top_cat = category_breakdown[0] %}
+                <div class="alert border-0 shadow-sm mb-3 d-flex align-items-center gap-2 p-2.5 rounded-3" style="background-color: #fffbeb; border: 1px solid #fef3c7 !important; color: #78350f;">
+                    <i class="bi bi-lightning-charge-fill text-warning" style="font-size: 1.1rem;"></i>
+                    <div class="small">
+                        <strong>Top Spending Category:</strong> {{ top_cat.category }} ({{ "{:,.1f}%".format(top_cat.percentage) }} of total spending - {{ top_cat.total_amount | currency_format(current_user.default_currency) }})
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="chart-container d-flex align-items-center justify-content-center" style="position: relative; height: 200px;">
                 {% if category_dist %}
                     <canvas id="categoryChart"></canvas>
                 {% else %}
@@ -155,6 +190,28 @@
                     </div>
                 {% endif %}
             </div>
+
+            <!-- Custom Sorted HTML Legend -->
+            {% if category_breakdown %}
+                <div class="mt-3 overflow-auto" style="max-height: 180px;">
+                    <table class="table table-sm table-borderless align-middle mb-0 small">
+                        <tbody>
+                            {% for item in category_breakdown %}
+                                {% set cat_color = CATEGORY_COLORS.get(item.category, '#64748b') %}
+                                <tr>
+                                    <td style="width: 10px; padding: 4px 0;">
+                                        <span class="d-inline-block rounded-circle" style="width: 9px; height: 9px; background-color: {{ cat_color }};"></span>
+                                    </td>
+                                    <td class="fw-semibold text-dark" style="padding: 4px 8px;">{{ item.category }}</td>
+                                    <td class="text-muted text-end" style="padding: 4px 8px;">{{ item.transaction_count }} txn{{ 's' if item.transaction_count > 1 else '' }}</td>
+                                    <td class="fw-semibold text-dark text-end" style="padding: 4px 8px;">{{ "{:,.1f}%".format(item.percentage) }}</td>
+                                    <td class="fw-bold text-dark text-end" style="padding: 4px 0;">{{ item.total_amount | currency_format(current_user.default_currency) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -230,6 +287,119 @@
                     {% endfor %}
                 {% else %}
                     <div class="text-muted small">No records compiled.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Spending Patterns Section -->
+<div class="row pt-4 mb-4">
+    <div class="col-12">
+        <hr class="text-muted mb-4">
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+            <h2 class="h4 font-outfit fw-bold mb-0">Spending Patterns & Insights</h2>
+            <button class="btn btn-link btn-sm text-decoration-none p-0 text-primary fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#learn-patterns-info" aria-expanded="false" aria-controls="learn-patterns-info" style="font-size: 0.85rem;">
+                <i class="bi bi-info-circle-fill"></i> Learn about these insights
+            </button>
+        </div>
+        <p class="text-muted small">Understand when you spend most to build healthier budgeting habits.</p>
+    </div>
+</div>
+
+<!-- Learn More Patterns Collapse Content -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="collapse" id="learn-patterns-info">
+            <div class="p-3 bg-light rounded-3 border border-light mb-2" style="color: #374151;">
+                <h5 class="fw-bold font-outfit text-dark mb-2" style="font-size: 0.95rem;">
+                    <i class="bi bi-calendar-check text-primary me-1"></i> Interpreting Your Timing Trends
+                </h5>
+                <p class="small mb-2">
+                    These charts track spending behaviors based on weekday and calendar day patterns.
+                </p>
+                <ul class="small text-muted mb-0 ps-3">
+                    <li><strong class="text-dark">Day of Week:</strong> Ranks your total spending and transaction frequency for Monday through Sunday. Highlights weekend spending surges.</li>
+                    <li><strong class="text-dark">Time of Month:</strong> Groups spending by calendar day (1–31) across the selected period. Useful for identifying payday spending surges or month-end spikes.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Smart Insights Dashboard Box -->
+{% if spending_patterns.insights %}
+    {% set ins = spending_patterns.insights %}
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card border-0 bg-light p-3 rounded-3 shadow-sm">
+                <h4 class="h6 font-outfit fw-bold text-dark mb-3"><i class="bi bi-lightning-fill text-warning me-1"></i> Behavioral Highlights</h4>
+                <div class="row g-3">
+                    <div class="col-md-3 col-sm-6 border-end border-light">
+                        <div class="text-muted small">Highest Spending Day</div>
+                        <div class="fw-bold text-dark fs-5">{{ ins.highest_spending_day }}</div>
+                        <div class="text-muted tiny">Peak: {{ ins.highest_spending_day_amount | currency_format(current_user.default_currency) }} total</div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 border-end border-light">
+                        <div class="text-muted small">Lowest Spending Day</div>
+                        <div class="fw-bold text-dark fs-5">{{ ins.lowest_spending_day or 'None' }}</div>
+                        <div class="text-muted tiny">Ideal for no-spend challenges</div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 border-end border-light">
+                        <div class="text-muted small">Weekend vs Weekday Daily Avg</div>
+                        <div class="fw-bold text-dark fs-5">
+                            {{ ins.weekend_daily_avg | currency_format(current_user.default_currency) }}
+                        </div>
+                        <div class="text-muted tiny">
+                            {% if ins.weekend_vs_weekday_pct > 0 %}
+                                Weekend is {{ ins.weekend_vs_weekday_pct }}% higher
+                            {% elif ins.weekend_vs_weekday_pct < 0 %}
+                                Weekend is {{ ins.weekend_vs_weekday_pct | abs }}% lower
+                            {% else %}
+                                Weekends match weekdays
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="text-muted small">Top Period of Month</div>
+                        <div class="fw-bold text-dark fs-5">{{ ins.highest_spending_period }}</div>
+                        <div class="text-muted tiny">Peak: {{ ins.highest_spending_period_amount | currency_format(current_user.default_currency) }} total</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Patterns Charts Row -->
+<div class="row g-4 mb-5">
+    <!-- Day of Week Chart -->
+    <div class="col-lg-6">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Day of the Week Spending</h3>
+            <div class="chart-container" style="position: relative; height: 260px;">
+                {% if spending_patterns.day_of_week %}
+                    <canvas id="dowChart"></canvas>
+                {% else %}
+                    <div class="text-muted text-center pt-5">
+                        No spending records found.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Time of Month Chart -->
+    <div class="col-lg-6">
+        <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
+            <h3 class="h5 fw-bold font-outfit mb-3">Time of the Month Spending (Days 1–31)</h3>
+            <div class="chart-container" style="position: relative; height: 260px;">
+                {% if spending_patterns.time_of_month %}
+                    <canvas id="domChart"></canvas>
+                {% else %}
+                    <div class="text-muted text-center pt-5">
+                        No spending records found.
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -432,8 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'right',
-                    labels: { boxWidth: 12, padding: 8, font: { family: 'Inter', size: 11 } }
+                    display: false
                 },
                 tooltip: {
                     callbacks: {
@@ -443,7 +612,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 label += ': ';
                             }
                             if (context.parsed !== undefined) {
-                                label += formatIndianNumber(context.parsed);
+                                const val = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                                label += formatIndianNumber(val) + ' (' + pct + '%)';
                             }
                             return label;
                         }
@@ -451,6 +623,153 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             cutout: '65%'
+        }
+    });
+    {% endif %}
+
+    // 3. Day of Week Bar Chart
+    {% if spending_patterns.day_of_week %}
+    const dowCtx = document.getElementById('dowChart').getContext('2d');
+    const dowData = {{ spending_patterns.day_of_week | tojson }};
+    
+    const dowLabels = dowData.map(item => item.day_name);
+    const dowTotals = dowData.map(item => item.total_spending);
+    const dowAverages = dowData.map(item => item.average_spending);
+    
+    new Chart(dowCtx, {
+        type: 'bar',
+        data: {
+            labels: dowLabels,
+            datasets: [
+                {
+                    label: 'Total Spent ({{ current_user.default_currency }})',
+                    data: dowTotals,
+                    backgroundColor: 'rgba(79, 70, 229, 0.75)',
+                    borderColor: '#4f46e5',
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Daily Average ({{ current_user.default_currency }})',
+                    data: dowAverages,
+                    backgroundColor: 'rgba(239, 68, 68, 0.75)',
+                    borderColor: '#ef4444',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    hidden: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: { boxWidth: 15, font: { family: 'Inter', size: 11 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== undefined) {
+                                label += formatIndianNumber(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        color: '#64748b',
+                        callback: function(value) {
+                            return formatIndianNumber(value);
+                        }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#64748b' }
+                }
+            }
+        }
+    });
+    {% endif %}
+
+    // 4. Time of Month Line Chart
+    {% if spending_patterns.time_of_month %}
+    const domCtx = document.getElementById('domChart').getContext('2d');
+    const domData = {{ spending_patterns.time_of_month | tojson }};
+    
+    const domLabels = domData.map(item => 'Day ' + item.day_num);
+    const domTotals = domData.map(item => item.total_spending);
+    
+    new Chart(domCtx, {
+        type: 'line',
+        data: {
+            labels: domLabels,
+            datasets: [
+                {
+                    label: 'Total Spent ({{ current_user.default_currency }})',
+                    data: domTotals,
+                    backgroundColor: 'rgba(79, 70, 229, 0.12)',
+                    borderColor: '#4f46e5',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#4f46e5',
+                    pointBorderColor: '#ffffff'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== undefined) {
+                                label += formatIndianNumber(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        color: '#64748b',
+                        callback: function(value) {
+                            return formatIndianNumber(value);
+                        }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color: '#64748b',
+                        maxTicksLimit: 10
+                    }
+                }
+            }
         }
     });
     {% endif %}

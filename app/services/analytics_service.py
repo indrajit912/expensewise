@@ -296,3 +296,179 @@ class AnalyticsService:
             'totals': totals,
             'moving_average': moving_average
         }
+
+    @classmethod
+    def get_category_breakdown(cls, user_id, start_date=None, end_date=None):
+        """
+        Computes category breakdown including total amount, percentage, and transaction count.
+        """
+        df = cls.get_user_expenses_df(user_id, start_date, end_date)
+        if df.empty:
+            return []
+            
+        total_spending = df['amount'].sum()
+        if total_spending <= 0:
+            return []
+            
+        # Group by category
+        grouped = df.groupby('category').agg(
+            total_amount=('amount', 'sum'),
+            transaction_count=('amount', 'size')
+        ).reset_index()
+        
+        # Filter out categories with zero spending
+        grouped = grouped[grouped['total_amount'] > 0]
+        
+        if grouped.empty:
+            return []
+            
+        # Calculate percentage
+        grouped['percentage'] = (grouped['total_amount'] / total_spending) * 100.0
+        
+        # Sort by total amount descending
+        grouped = grouped.sort_values(by='total_amount', ascending=False)
+        
+        breakdown = []
+        for _, row in grouped.iterrows():
+            breakdown.append({
+                'category': row['category'],
+                'total_amount': float(round(row['total_amount'], 2)),
+                'percentage': float(round(row['percentage'], 2)),
+                'transaction_count': int(row['transaction_count'])
+            })
+            
+        return breakdown
+
+    @classmethod
+    def get_spending_patterns(cls, user_id, start_date=None, end_date=None):
+        """
+        Computes day-of-week and day-of-month spending patterns and insights.
+        """
+        df = cls.get_user_expenses_df(user_id, start_date, end_date)
+        if df.empty:
+            return {
+                'day_of_week': [],
+                'time_of_month': [],
+                'insights': {}
+            }
+            
+        df['expense_date'] = pd.to_datetime(df['expense_date'])
+        
+        # 1. Day of Week Analysis
+        # weekday: 0 = Monday, 6 = Sunday
+        df['weekday'] = df['expense_date'].dt.weekday
+        df['day_name'] = df['expense_date'].dt.day_name()
+        
+        weekday_map = {
+            0: 'Monday', 1: 'Tuesday', 2: 'Wednesday',
+            3: 'Thursday', 4: 'Friday', 5: 'Saturday', 6: 'Sunday'
+        }
+        
+        dow_list = []
+        for w_code in range(7):
+            d_name = weekday_map[w_code]
+            sub = df[df['weekday'] == w_code]
+            if sub.empty:
+                dow_list.append({
+                    'day_name': d_name,
+                    'total_spending': 0.0,
+                    'average_spending': 0.0,
+                    'transaction_count': 0,
+                    'top_category': 'None'
+                })
+            else:
+                total_sp = float(round(sub['amount'].sum(), 2))
+                count = int(sub['amount'].count())
+                # Group by date to get daily average on that specific weekday
+                daily_sums = sub.groupby(sub['expense_date'].dt.date)['amount'].sum()
+                avg_sp = float(round(daily_sums.mean(), 2)) if not daily_sums.empty else 0.0
+                
+                # Top category on this day
+                top_cat = sub.groupby('category')['amount'].sum().idxmax()
+                
+                dow_list.append({
+                    'day_name': d_name,
+                    'total_spending': total_sp,
+                    'average_spending': avg_sp,
+                    'transaction_count': count,
+                    'top_category': top_cat
+                })
+                
+        # 2. Time of Month (Days 1 to 31)
+        df['day_num'] = df['expense_date'].dt.day
+        
+        dom_list = []
+        for d_num in range(1, 32):
+            sub = df[df['day_num'] == d_num]
+            if sub.empty:
+                dom_list.append({
+                    'day_num': d_num,
+                    'total_spending': 0.0,
+                    'average_spending': 0.0,
+                    'transaction_count': 0
+                })
+            else:
+                total_sp = float(round(sub['amount'].sum(), 2))
+                count = int(sub['amount'].count())
+                
+                # Get number of distinct years/months that have this day number in the dataset
+                distinct_periods = sub['expense_date'].dt.to_period('M').nunique()
+                avg_sp = float(round(total_sp / distinct_periods, 2)) if distinct_periods > 0 else 0.0
+                
+                dom_list.append({
+                    'day_num': d_num,
+                    'total_spending': total_sp,
+                    'average_spending': avg_sp,
+                    'transaction_count': count
+                })
+                
+        # 3. Dynamic Insights Generation
+        insights = {}
+        valid_dow = [d for d in dow_list if d['transaction_count'] > 0]
+        
+        if valid_dow:
+            highest_dow = max(valid_dow, key=lambda x: x['total_spending'])
+            lowest_dow = min(dow_list, key=lambda x: x['total_spending'])
+            
+            insights['highest_spending_day'] = highest_dow['day_name']
+            insights['highest_spending_day_amount'] = highest_dow['total_spending']
+            insights['lowest_spending_day'] = lowest_dow['day_name']
+            insights['lowest_spending_day_amount'] = lowest_dow['total_spending']
+            insights['top_category_on_high_day'] = highest_dow['top_category']
+            
+            # Weekend (Sat/Sun) vs Weekday (Mon-Fri) average daily spending
+            weekend_sub = df[df['weekday'].isin([5, 6])]
+            weekday_sub = df[df['weekday'].isin([0, 1, 2, 3, 4])]
+            
+            weekend_daily = weekend_sub.groupby(weekend_sub['expense_date'].dt.date)['amount'].sum()
+            weekday_daily = weekday_sub.groupby(weekday_sub['expense_date'].dt.date)['amount'].sum()
+            
+            insights['weekend_daily_avg'] = float(round(weekend_daily.mean(), 2)) if not weekend_daily.empty else 0.0
+            insights['weekday_daily_avg'] = float(round(weekday_daily.mean(), 2)) if not weekday_daily.empty else 0.0
+            
+            if insights['weekday_daily_avg'] > 0:
+                insights['weekend_vs_weekday_pct'] = float(round(
+                    ((insights['weekend_daily_avg'] - insights['weekday_daily_avg']) / insights['weekday_daily_avg']) * 100.0, 1
+                ))
+            else:
+                insights['weekend_vs_weekday_pct'] = 0.0
+                
+        # Time period of the month comparison: Days 1-10, 11-20, 21-31
+        p1 = df[df['day_num'].between(1, 10)]['amount'].sum()
+        p2 = df[df['day_num'].between(11, 20)]['amount'].sum()
+        p3 = df[df['day_num'].between(21, 31)]['amount'].sum()
+        
+        periods = [
+            {'range': 'Days 1-10', 'total': float(p1)},
+            {'range': 'Days 11-20', 'total': float(p2)},
+            {'range': 'Days 21-31', 'total': float(p3)}
+        ]
+        highest_period = max(periods, key=lambda x: x['total'])
+        insights['highest_spending_period'] = highest_period['range']
+        insights['highest_spending_period_amount'] = highest_period['total']
+        
+        return {
+            'day_of_week': dow_list,
+            'time_of_month': dom_list,
+            'insights': insights
+        }

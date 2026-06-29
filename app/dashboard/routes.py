@@ -3,7 +3,7 @@ import re
 import json
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, abort, current_app
 from flask_login import login_required, current_user
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from app.extensions import db
 from app.models.user import User, APIToken, AuditLog
 from app.models.expense import Expense, Category, PaymentMethod
@@ -40,14 +40,17 @@ def index():
     comp_metrics = AnalyticsService.get_comparison_metrics(user_id)
     
     # 2. Fetch chart datasets
+    # Query strictly the last 30 days consistently
+    _today = date.today()
+    start_date = _today - timedelta(days=30)
     daily_labels, daily_values = AnalyticsService.get_daily_trend(user_id, days=30)
-    category_dist = AnalyticsService.get_category_distribution(user_id)
+    category_dist = AnalyticsService.get_category_distribution(user_id=user_id, start_date=start_date, end_date=_today)
     
     # 3. Grab recent expenses (limit 5) for quick overview
     # Sort in memory since dates are encrypted in database
     expenses = Expense.query.filter_by(user_id=user_id).all()
     expenses.sort(key=lambda x: x.expense_date or datetime.min.date(), reverse=True)
-    recent_expenses = expenses[:5]
+    recent_expenses = expenses[:8]
         
     return render_template(
         'dashboard/index.html',

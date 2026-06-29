@@ -89,9 +89,25 @@ def test_expenses_web_exports(client, test_user):
 def test_analytics_route(client, test_user):
     """Tests loading the visual analytics page."""
     client.post('/auth/login', data={'email': 'test@example.com', 'password': 'Password123!'})
+    
+    # 1. Test default load (6 months)
     response = client.get('/analytics/')
     assert response.status_code == 200
     assert b'Analytics Engine' in response.data
+    assert b'6-Month Spending History' in response.data
+    assert b'Top Allocation Categories (Past 6 Months)' in response.data
+    
+    # 2. Test query parameter override (12 months)
+    response = client.get('/analytics/?months=12')
+    assert response.status_code == 200
+    assert b'12-Month Spending History' in response.data
+    assert b'Top Allocation Categories (Past 12 Months)' in response.data
+    
+    # 3. Test session persistence (should load 12 months on reload without param)
+    response = client.get('/analytics/')
+    assert response.status_code == 200
+    assert b'12-Month Spending History' in response.data
+    assert b'Top Allocation Categories (Past 12 Months)' in response.data
 
 
 def test_auth_reset_views(client, test_user):

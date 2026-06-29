@@ -190,6 +190,7 @@
           { "name": "page", "in": "query", "schema": { "type": "integer" }, "description": "Page index (1-based)" },
           { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Substring match description/payee" },
           { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by exact category name" },
+          { "name": "mode", "in": "query", "schema": { "type": "string" }, "description": "Filter by exact payment mode" },
           { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "YYYY-MM-DD start filter" },
           { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "YYYY-MM-DD end filter" }
         ],

@@ -9,7 +9,7 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
     """Schema to serialize User details."""
     class Meta:
         model = User
-        fields = ('id', 'name', 'email', 'date_joined', 'last_login', 'default_currency')
+        fields = ('id', 'name', 'email', 'date_joined', 'last_login', 'default_currency', 'encryption_enabled')
 
 
 class CategorySchema(ma.SQLAlchemyAutoSchema):

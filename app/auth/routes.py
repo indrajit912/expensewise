@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash
 from app.extensions import db
 from app.models.user import User, UserOTP
-from app.auth.forms import LoginForm, RegisterForm, ResetPasswordRequestForm, ResetPasswordForm, populate_timezone_choices
+from app.auth.forms import LoginForm, RegisterForm, ResetPasswordRequestForm, ResetPasswordForm
 from app.services.email_service import EmailService
 from app.services.encryption_service import EncryptionService
 from app.services.audit_service import AuditService
@@ -21,10 +21,6 @@ def register():
     
     form = RegisterForm()
     
-    # Populate timezone choices
-    if request.method == 'GET':
-        populate_timezone_choices(form)
-    
     if form.validate_on_submit():
         # Validate timezone
         if not TimezoneService.is_valid_timezone(form.timezone.data):
@@ -39,7 +35,8 @@ def register():
             username=form.username.data.lower().strip(),
             email=form.email.data.lower().strip(),
             default_currency=form.default_currency.data,
-            timezone=timezone_value
+            timezone=timezone_value,
+            encryption_enabled=form.encryption_enabled.data
         )
         user.set_password(form.password.data)
         

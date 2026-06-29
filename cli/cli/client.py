@@ -278,6 +278,18 @@ class APIClient:
         url = f"{self.api_url}/v1/auth/me"
         return requests.get(url, headers=self.get_headers())
 
+    def update_profile(self, name=None, default_currency=None, encryption_enabled=None):
+        """Updates user profile settings including E2E encryption preferences."""
+        url = f"{self.api_url}/v1/auth/me"
+        payload = {}
+        if name is not None:
+            payload['name'] = name
+        if default_currency is not None:
+            payload['default_currency'] = default_currency
+        if encryption_enabled is not None:
+            payload['encryption_enabled'] = encryption_enabled
+        return requests.put(url, json=payload, headers=self.get_headers())
+
     def change_password(self, current_password, new_password):
         """Changes password for the currently logged in user."""
         url = f"{self.api_url}/v1/auth/change-password"

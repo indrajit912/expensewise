@@ -384,9 +384,47 @@ Configure the application behavior using the following environment variables:
 | `FLASK_DEBUG` | Starts development server in debug mode if `1` | `0` |
 | `HERMES_API_KEY` | Hermes Service access key (Email delivery) | `None` |
 
+## 8. Optional Data Encryption Mode
+
+To optimize page loading performance, ExpenseWise offers an optional, user-controlled **End-to-End (E2E) Data Encryption** mode.
+
+By default, **E2E Encryption is disabled** for newly registered users. This default setting was selected to ensure maximum application responsiveness, reduce cryptographic CPU overhead, and eliminate decryption latency during heavy dashboard and analytics reports.
+
+### Performance vs. Privacy Trade-Off
+* **Encryption Disabled (Default)**: Stores transaction details (amount, category, description, payee, payment mode, date) as plaintext. Skips cryptographic operations, resulting in significantly faster page loading speeds and database queries.
+* **Encryption Enabled**: Encrypts all transaction details at rest using AES-256 (Fernet) before storing them. Provides maximum privacy and security, but introduces decryption latency during data reads.
+
+### Configuring Settings during Registration
+When creating an account, users can check the **End-to-End Encryption** checkbox on the registration page to enable it immediately. If left unchecked (default), the account is created with encryption disabled.
+
+### Changing Settings from the Web Interface
+1. Navigate to the **Settings** page.
+2. Scroll to the **Data Encryption** section.
+3. Toggle the **End-to-End Encryption** switch.
+4. Click **Update Encryption Preference**. This automatically performs an in-memory background migration of all your historical transaction records to the new format.
+
+### Changing Settings from the CLI
+Use the top-level `encryption` command:
+```bash
+# View current encryption status
+expensewise-cli encryption
+
+# Enable encryption (initiates database re-encryption migration)
+expensewise-cli encryption enable
+
+# Disable encryption (initiates database decryption migration)
+expensewise-cli encryption disable
+```
+
+### Migration Behavior
+When toggling the preference:
+* Switching **ON**: The server loads all existing plaintext records, encrypts them using your Fernet vault key, and writes them back.
+* Switching **OFF**: The server decrypts all existing encrypted records using your Fernet vault key and stores them in plaintext.
+* Standard getters/setters auto-detect values and decrypt existing encrypted values on-the-fly even if encryption is currently disabled.
+
 ---
 
-## 8. Deployment
+## 9. Deployment
 
 ### Production Flag
 When deploying in production, ensure `FLASK_DEBUG=0` is set in the production dashboard. This automatically activates the `ProductionConfig` settings, which disable local SQLite fallbacks, enforce strict HTTPS redirects using `Flask-Talisman`, and disable debug trace logging.
@@ -399,7 +437,7 @@ gunicorn -w 4 "manage:app"
 
 ---
 
-## 9. Contributing
+## 10. Contributing
 
 We welcome contributions to ExpenseWise! Please follow these guidelines:
 1. Fork the repository and create a feature branch (`git checkout -b feature/amazing-feature`).
@@ -410,7 +448,7 @@ We welcome contributions to ExpenseWise! Please follow these guidelines:
 
 ---
 
-## 10. Roadmap
+## 11. Roadmap
 
 * **Multi-Currency Aggregations:** Display dashboard analytics conversions dynamically across selected user standard currencies.
 * **Visual Budget Alerts:** Configurable system alerts when spending threshold limits exceed 80% of category budget limits.
@@ -419,6 +457,6 @@ We welcome contributions to ExpenseWise! Please follow these guidelines:
 
 ---
 
-## 11. License
+## 12. License
 
 This project is licensed under the terms of the MIT License. See the [LICENSE](./LICENSE) file for the full text. The MIT License is appropriate for this project as it permits modification, distribution, commercial use, and private hosting, allowing developers to adapt ExpenseWise for their own needs while providing the maintainer complete liability protection.

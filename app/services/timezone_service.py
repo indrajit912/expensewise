@@ -68,7 +68,6 @@ class TimezoneService:
         ],
         'UTC': [
             'UTC',
-            'Etc/UTC',
         ]
     }
 

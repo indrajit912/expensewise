@@ -141,10 +141,73 @@ class EncryptionService:
                 pass
 
     @staticmethod
+    def is_encryption_enabled_for_context() -> bool:
+        """Determines if encryption is enabled for the active user context."""
+        override = getattr(_local_data, 'encryption_enabled_override', None)
+        if override is not None:
+            return override
+            
+        from flask import has_request_context, g
+        from flask_login import current_user
+        
+        # Check g.current_user (REST API context)
+        if has_request_context() and hasattr(g, 'current_user') and g.current_user:
+            return getattr(g.current_user, 'encryption_enabled', True)
+            
+        # Check current_user (web app context)
+        if has_request_context():
+            try:
+                if current_user and current_user.is_authenticated:
+                    return getattr(current_user, 'encryption_enabled', True)
+            except Exception:
+                pass
+                
+        return True
+
+    @staticmethod
+    def migrate_user_encryption(user, enable_encryption: bool):
+        """Migrates all of a user's expenses between encrypted and plaintext storage formats."""
+        # 1. Set override to old format to read existing data correctly
+        _local_data.encryption_enabled_override = not enable_encryption
+        
+        try:
+            from app.models.expense import Expense
+            expenses = Expense.query.filter_by(user_id=user.id).all()
+            
+            # 2. Set override to target format to write in new format
+            _local_data.encryption_enabled_override = enable_encryption
+            
+            for e in expenses:
+                # Re-assign properties to trigger setter encryption/plaintext logic
+                e.amount = e.amount
+                e.category = e.category
+                e.description = e.description
+                e.payee = e.payee
+                e.payment_mode = e.payment_mode
+                e.expense_date = e.expense_date
+                
+                # Re-assign currency properties if present
+                if e.original_amount_enc is not None or e.amount_enc is not None:
+                    e.original_amount = e.original_amount
+                if e.original_currency_enc is not None:
+                    e.original_currency = e.original_currency
+                if e.conversion_rate_enc is not None:
+                    e.conversion_rate = e.conversion_rate
+                if e.converted_amount_enc is not None:
+                    e.converted_amount = e.converted_amount
+                    
+        finally:
+            if hasattr(_local_data, 'encryption_enabled_override'):
+                del _local_data.encryption_enabled_override
+
+    @staticmethod
     def encrypt(plaintext: str) -> str:
         """Encrypts data string using the current user's unlocked Fernet key."""
         if plaintext is None:
             return None
+            
+        if not EncryptionService.is_encryption_enabled_for_context():
+            return str(plaintext)
         
         key = EncryptionService.get_user_key()
         if not key:
@@ -161,7 +224,11 @@ class EncryptionService:
             
         key = EncryptionService.get_user_key()
         if not key:
-            raise ValueError("Encryption key is locked. Please log in to unlock your data vault.")
+            return ciphertext
             
-        f = Fernet(key.encode())
-        return f.decrypt(ciphertext.encode()).decode()
+        try:
+            f = Fernet(key.encode())
+            return f.decrypt(ciphertext.encode()).decode()
+        except Exception:
+            # Fallback to returning the value directly (handles plaintext databases or toggled states)
+            return ciphertext

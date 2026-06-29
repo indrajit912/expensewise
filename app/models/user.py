@@ -27,6 +27,7 @@ class User(db.Model, UserMixin):
     encrypted_fernet_key = db.Column(db.Text, nullable=False)
     server_encrypted_fernet_key = db.Column(db.Text, nullable=True)
     kdf_salt = db.Column(db.LargeBinary, nullable=False)
+    encryption_enabled = db.Column(db.Boolean, default=False, nullable=False)
 
     # Administrator Roles
     is_admin = db.Column(db.Boolean, default=False, nullable=False)

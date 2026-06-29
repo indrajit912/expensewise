@@ -50,7 +50,13 @@ class RegisterForm(FlaskForm):
         ('CAD', 'CAD (C$)')
     ], validators=[DataRequired()], default='INR')
     timezone = SelectField('Timezone', choices=[('UTC', 'UTC')], validators=[DataRequired()], default='UTC')
+    encryption_enabled = BooleanField('End-to-End Encryption', default=False)
     submit = SubmitField('Create Account')
+
+    def __init__(self, *args, **kwargs):
+        super(RegisterForm, self).__init__(*args, **kwargs)
+        timezone_list = TimezoneService.get_timezone_list()
+        self.timezone.choices = [(tz, tz) for tz in timezone_list]
 
     def validate_email(self, field):
         """Custom validator to check if email address is already taken."""

@@ -205,7 +205,7 @@
                         'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos', 'Africa/Nairobi',
                         'Africa/Casablanca',
                         // UTC
-                        'UTC', 'Etc/UTC'
+                        'UTC'
                     ].sort();
                     
                     const currentTz = '{{ current_user.timezone }}';
@@ -225,6 +225,30 @@
                     });
                 });
             </script>
+
+            <hr class="my-4">
+
+            <!-- Data Encryption Settings Form -->
+            <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="update_encryption">
+                
+                <h4 class="h6 fw-bold font-outfit mb-3"><i class="bi bi-shield-lock text-primary me-2"></i>Data Encryption</h4>
+                
+                <div class="form-check form-switch mb-3">
+                    <input type="checkbox" name="encryption_enabled" value="1" class="form-check-input" id="settings-encryption-check" {% if current_user.encryption_enabled %}checked{% endif %}>
+                    <label class="form-check-label fw-semibold" for="settings-encryption-check">End-to-End Encryption (Recommended)</label>
+                </div>
+                
+                <div class="alert alert-warning alert-sm py-2 px-3 mb-3" style="font-size: 0.85rem;">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Disabling encryption stores data in plaintext, improving performance. Toggling this will automatically migrate all your existing records.
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">Update Encryption Preference</button>
+                </div>
+            </form>
         </div>
     </div>
 

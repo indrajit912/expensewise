@@ -425,6 +425,25 @@ def settings():
             
             return redirect(url_for('dashboard.settings'))
 
+        # Encryption Mode Update Action
+        elif action == 'update_encryption':
+            enable_enc = request.form.get('encryption_enabled') == '1'
+            old_enc = current_user.encryption_enabled
+            
+            if old_enc != enable_enc:
+                from app.services.encryption_service import EncryptionService
+                EncryptionService.migrate_user_encryption(current_user, enable_enc)
+                current_user.encryption_enabled = enable_enc
+                db.session.commit()
+                
+                state_str = "enabled" if enable_enc else "disabled"
+                AuditService.log("Encryption Toggle", f"Changed encryption preference to {state_str}")
+                flash(f"Data encryption has been {state_str} successfully. Existing data has been migrated.", "success")
+            else:
+                flash("Encryption setting was not changed.", "info")
+                
+            return redirect(url_for('dashboard.settings'))
+
     return render_template(
         'dashboard/settings.html', 
         tokens=user_tokens, 

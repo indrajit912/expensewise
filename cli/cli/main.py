@@ -106,6 +106,7 @@ def show_custom_help():
         ("logout", "Log out and clear local session token"),
         ("register", "Create a new multi-user account"),
         ("change-password", "Securely update account password"),
+        ("encryption", "Manage End-to-End Encryption preference"),
         ("profile", "Display active user account details"),
         ("auth", "Manage credentials and verify active token status")
     ])
@@ -239,6 +240,12 @@ SUBCOMMAND_EXAMPLES = {
     'change-password': (
         "  expensewise-cli change-password\n"
         "  # Updates password for authenticated account. Securely confirms current and new values."
+    ),
+    'encryption': (
+        "  expensewise-cli encryption\n"
+        "  # Displays current End-to-End Encryption preference status.\n\n"
+        "  expensewise-cli encryption off\n"
+        "  # Disables encryption mode, prompting with trade-offs and executing data decryption migration."
     ),
     'profile': (
         "  expensewise-cli profile\n"
@@ -730,6 +737,11 @@ def auth_status():
         table.add_row("Email Address", data.get('email'))
         table.add_row("Active Token", masked)
         table.add_row("Server Host", client.api_url)
+        
+        enc_enabled = data.get('encryption_enabled', True)
+        enc_status = "[bold green]Enabled (E2E)[/]" if enc_enabled else "[bold yellow]Disabled (Plaintext)[/]"
+        table.add_row("Data Encryption", enc_status)
+        
         table.add_row("Session State", "[bold green]Active & Verified[/]")
         console.print(table)
     else:
@@ -759,6 +771,39 @@ def auth_token():
         client.clear_token()
         console.print("[bold red]Authentication Failed:[/] The provided token is invalid or expired.")
 
+@auth.command(name='encryption', cls=CustomHelpCommand)
+@click.argument('status', type=click.Choice(['on', 'off', 'enable', 'disable'], case_sensitive=False), required=False)
+def auth_encryption(status):
+    """View or configure user data encryption preference.
+
+    STATUS: 'on'/'enable' to enable E2E encryption, 'off'/'disable' to disable it.
+    """
+    token = client.load_token()
+    if not token:
+        console.print("[bold red]Error:[/] You must be logged in to view or manage encryption settings.")
+        return
+        
+    if status is None:
+        res = client.get_profile()
+        if res.status_code == 200:
+            enabled = res.json().get('encryption_enabled', True)
+            status_str = "[bold green]Enabled (E2E)[/]" if enabled else "[bold yellow]Disabled (Plaintext)[/]"
+            console.print(f"Data Encryption preference is currently: {status_str}")
+        else:
+            console.print("[bold red]Error:[/] Failed to retrieve encryption setting.")
+        return
+        
+    target_enabled = status.lower() in ['on', 'enable']
+    console.print(f"Updating encryption preference to: [bold]{'ENABLED' if target_enabled else 'DISABLED'}[/]...")
+    console.print("[yellow]Migrating all transaction records. This may take a moment...[/]")
+    
+    res = client.update_profile(encryption_enabled=target_enabled)
+    if res.status_code == 200:
+        console.print(f"[bold green]Success![/] Data encryption preference updated and records migrated successfully.")
+    else:
+        err = res.json().get('message') or res.json().get('error') or "Unknown error"
+        console.print(f"[bold red]Failed to update encryption settings:[/] {err}")
+
 
 @cli.command(cls=CustomHelpCommand)
 @click.option('--revoke', is_flag=True, help='Explicitly revoke/delete the active token on the server as well.')
@@ -778,6 +823,73 @@ def logout(revoke):
     else:
         client.clear_token()
         console.print("[bold green]Success![/] Local session token cleared from your machine. Stored API token remains valid on the server.")
+
+
+@cli.command(name='encryption', cls=CustomHelpCommand)
+@click.argument('status', type=click.Choice(['on', 'off', 'enable', 'disable'], case_sensitive=False), required=False)
+@click.pass_context
+def manage_encryption(ctx, status):
+    """View or configure End-to-End Encryption (E2E) preference."""
+    token = client.load_token()
+    if not token:
+        console.print("[bold red]Error:[/] You must be logged in to view or manage encryption settings.")
+        return
+        
+    res = client.get_profile()
+    if res.status_code != 200:
+        console.print("[bold red]Error:[/] Failed to retrieve profile settings from server.")
+        return
+        
+    data = res.json()
+    current_enabled = data.get('encryption_enabled', True)
+    
+    if status is None:
+        status_str = "[bold green]ENABLED (E2E)[/]" if current_enabled else "[bold yellow]DISABLED (Plaintext)[/]"
+        console.print(f"\n[bold cyan]End-to-End Data Encryption Preference[/]")
+        console.print(f"Current Status: {status_str}\n")
+        console.print("To change this preference, run:")
+        console.print("  [green]expensewise-cli encryption [on|off][/]")
+        return
+        
+    target_enabled = status.lower() in ['on', 'enable']
+    if target_enabled == current_enabled:
+        status_str = "enabled" if target_enabled else "disabled"
+        console.print(f"[yellow]Info:[/] Encryption is already {status_str} for your account.")
+        return
+
+    # Print trade-offs
+    console.print("\n[bold cyan]=== Encryption Preference Change Request ===[/]\n")
+    console.print("[bold]When E2E Encryption is Enabled (Recommended):[/]")
+    console.print("  [green]✅[/] Your data is encrypted before being stored in the database.")
+    console.print("  [green]✅[/] Provides maximum privacy and security.")
+    console.print("  [red]❌[/] Reading and writing data may be slightly slower due to encryption and decryption overhead.")
+    console.print("")
+    console.print("[bold]When E2E Encryption is Disabled:[/]")
+    console.print("  [green]✅[/] Faster application performance and quicker page/API responses.")
+    console.print("  [green]✅[/] Reduced CPU overhead during data access.")
+    console.print("  [red]❌[/] Your data is stored in plaintext in the database and no longer benefits from end-to-end encryption.")
+    console.print("")
+    console.print("[bold yellow]Important Notice:[/]")
+    console.print("  * Encryption is enabled by default for all users.")
+    console.print("  * Disabling encryption is recommended only if you understand the associated privacy trade-offs.")
+    console.print("")
+    
+    action_str = "ENABLE" if target_enabled else "DISABLE"
+    prompt_msg = f"Are you sure you want to {action_str} End-to-End Encryption and migrate your data?"
+    if not click.confirm(prompt_msg, default=False):
+        console.print("[yellow]Operation cancelled by user.[/]")
+        return
+        
+    console.print(f"\nUpdating encryption preference to: [bold]{'ENABLED' if target_enabled else 'DISABLED'}[/]...")
+    console.print("[yellow]Migrating all transaction records. This may take a moment...[/]")
+    
+    res = client.update_profile(encryption_enabled=target_enabled)
+    if res.status_code == 200:
+        new_status_str = "[bold green]ENABLED[/]" if target_enabled else "[bold yellow]DISABLED (Plaintext)[/]"
+        console.print(f"[bold green]Success![/] Data encryption preference updated to {new_status_str} and records migrated successfully.\n")
+    else:
+        err = res.json().get('message') or res.json().get('error') or "Unknown error"
+        console.print(f"[bold red]Failed to update encryption settings:[/] {err}")
 
 
 @cli.command(cls=CustomHelpCommand)
@@ -826,6 +938,11 @@ def profile():
         table.add_row("Default Currency", data.get('default_currency'))
         table.add_row("Admin Status", "Administrator" if data.get('is_admin') else "Standard User")
         table.add_row("Joined On", data.get('created_at').split('T')[0])
+        
+        enc_enabled = data.get('encryption_enabled', True)
+        enc_status = "Enabled (E2E)" if enc_enabled else "Disabled (Plaintext)"
+        table.add_row("Data Encryption", enc_status)
+        
         console.print(table)
     else:
         console.print("[bold red]Failed to load profile details.[/]")

@@ -104,6 +104,17 @@
                         });
                     </script>
 
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="form-check form-switch">
+                            {{ form.encryption_enabled(class="form-check-input", id="encryption-check") }}
+                            <label class="form-check-label fw-bold" for="encryption-check">End-to-End Encryption</label>
+                        </div>
+                        <div class="form-text text-muted ms-4 mt-1" style="font-size: 0.85rem;">
+                            <strong>When enabled:</strong> User data is encrypted before being stored, providing stronger privacy and security, but with a slight performance overhead.<br>
+                            <strong>When disabled (default):</strong> Data is stored without encryption, resulting in better application performance, but with reduced privacy since the data is stored in plaintext.
+                        </div>
+                    </div>
+
                     <div class="row mb-4">
                         <div class="col-md-6 mb-3 mb-md-0">
                             {{ form.password.label(class="form-label") }}

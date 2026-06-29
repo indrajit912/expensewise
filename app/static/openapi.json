@@ -33,11 +33,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "email": { "type": "string", "format": "email" },
-                  "password": { "type": "string" }
+                  "name": { "type": "string", "description": "Full name of the user" },
+                  "username": { "type": "string", "description": "Unique user identifier (minimum 3 characters)" },
+                  "email": { "type": "string", "format": "email", "description": "Valid email address for OTP delivery" },
+                  "password": { "type": "string", "description": "Account password complying with complexity rules" },
+                  "encryption_enabled": { "type": "boolean", "default": false, "description": "Optional flag to enable End-to-End Encryption. Defaults to false." }
                 },
-                "required": ["name", "email", "password"]
+                "required": ["name", "username", "email", "password"]
               }
             }
           }

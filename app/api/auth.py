@@ -53,7 +53,13 @@ def api_register():
         return jsonify({'error': 'Conflict', 'message': 'This username is already taken.'}), 409
 
     try:
-        user = User(name=name, username=username, email=email)
+        encryption_enabled_val = data.get('encryption_enabled', False)
+        if isinstance(encryption_enabled_val, str):
+            encryption_enabled = encryption_enabled_val.lower() in ['true', '1', 'yes', 'on']
+        else:
+            encryption_enabled = bool(encryption_enabled_val)
+            
+        user = User(name=name, username=username, email=email, encryption_enabled=encryption_enabled)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
@@ -340,17 +346,55 @@ def api_logout():
         return jsonify({'error': 'Server Error', 'message': str(e)}), 500
 
 
-@api.route('/v1/auth/me', methods=['GET'])
+@api.route('/v1/auth/me', methods=['GET', 'PUT', 'PATCH'])
 @token_required
 def api_me():
-    """Retrieve details of the currently authenticated user."""
+    """Retrieve or update details of the currently authenticated user."""
     user = g.current_user
+    if request.method in ['PUT', 'PATCH']:
+        data = request.get_json() or {}
+        
+        name = data.get('name')
+        if name is not None:
+            user.name = name.strip()
+            
+        default_currency = data.get('default_currency')
+        if default_currency is not None:
+            user.default_currency = default_currency.strip().upper()
+            
+        encryption_enabled_val = data.get('encryption_enabled')
+        if encryption_enabled_val is not None:
+            if isinstance(encryption_enabled_val, str):
+                target_enabled = encryption_enabled_val.lower() in ['true', '1', 'yes', 'on']
+            else:
+                target_enabled = bool(encryption_enabled_val)
+                
+            if target_enabled != user.encryption_enabled:
+                from app.services.encryption_service import EncryptionService
+                EncryptionService.migrate_user_encryption(user, target_enabled)
+                user.encryption_enabled = target_enabled
+                
+        db.session.commit()
+        return jsonify({
+            'message': 'Profile updated successfully.',
+            'id': user.id,
+            'name': user.name,
+            'username': user.username,
+            'email': user.email,
+            'default_currency': user.default_currency,
+            'encryption_enabled': user.encryption_enabled,
+            'is_active': user.is_active,
+            'is_admin': user.is_admin,
+            'created_at': user.date_joined.isoformat()
+        }), 200
+
     return jsonify({
         'id': user.id,
         'name': user.name,
         'username': user.username,
         'email': user.email,
         'default_currency': user.default_currency,
+        'encryption_enabled': user.encryption_enabled,
         'is_active': user.is_active,
         'is_admin': user.is_admin,
         'created_at': user.date_joined.isoformat()

@@ -157,9 +157,12 @@ class Expense(db.Model):
         }
 
     @staticmethod
-    def get_filtered_expenses(user_id, category=None, start_date=None, end_date=None, search_query=None):
+    def get_filtered_expenses(user_id, category=None, start_date=None, end_date=None, search_query=None, db_created_at_cutoff=None):
         """Retrieves and filters user expenses in-memory securely (handles encrypted fields)."""
-        all_expenses = Expense.query.filter_by(user_id=user_id).all()
+        query = Expense.query.filter_by(user_id=user_id)
+        if db_created_at_cutoff:
+            query = query.filter(Expense.created_at >= db_created_at_cutoff)
+        all_expenses = query.all()
         filtered = []
         for e in all_expenses:
             try:

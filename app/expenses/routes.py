@@ -62,8 +62,15 @@ def list_expenses():
     search_query = request.args.get('search', '').strip()
     category_filter = request.args.get('category', '').strip()
     
-    start_date_str = request.args.get('start_date', '').strip()
-    end_date_str = request.args.get('end_date', '').strip()
+    # Set default date filter to past one year on initial load
+    if 'start_date' not in request.args and 'end_date' not in request.args:
+        today = date.today()
+        one_year_ago = today - timedelta(days=365)
+        start_date_str = one_year_ago.isoformat()
+        end_date_str = today.isoformat()
+    else:
+        start_date_str = request.args.get('start_date', '').strip()
+        end_date_str = request.args.get('end_date', '').strip()
     
     sort_by = request.args.get('sort_by', 'expense_date')
     order = request.args.get('order', 'desc')
@@ -82,15 +89,33 @@ def list_expenses():
         except ValueError:
             pass
 
+    # Optimize database query by filtering by created_at if start_date is active
+    db_created_at_cutoff = None
+    if start_date:
+        if end_date:
+            delta_days = (end_date - start_date).days + 1
+        else:
+            delta_days = 365
+        preceding_start = start_date - timedelta(days=delta_days)
+        # created_at is always >= expense_date, so filter created_at >= preceding_start - 2 days to be safe
+        db_created_at_cutoff = datetime.combine(preceding_start - timedelta(days=2), datetime.min.time())
+
     filtered_items = Expense.get_filtered_expenses(
         user_id=current_user.id,
         category=category_filter,
         start_date=start_date,
         end_date=end_date,
-        search_query=search_query
+        search_query=search_query,
+        db_created_at_cutoff=db_created_at_cutoff
     )
     
-    all_expenses = Expense.query.filter_by(user_id=current_user.id).all()
+    if db_created_at_cutoff:
+        all_expenses = Expense.query.filter(
+            Expense.user_id == current_user.id,
+            Expense.created_at >= db_created_at_cutoff
+        ).all()
+    else:
+        all_expenses = Expense.query.filter_by(user_id=current_user.id).all()
 
     # =========================================================================
     #                   ANALYTICS & INSIGHTS CALCULATIONS

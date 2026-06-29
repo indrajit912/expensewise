@@ -380,8 +380,8 @@
                                     {{ exp.category }}
                                 </span>
                             </td>
-                            <td class="text-truncate" style="max-width: 140px;">{{ exp.payee or '-' }}</td>
-                            <td class="text-truncate" style="max-width: 200px;">{{ exp.description or '-' }}</td>
+                            <td class="text-truncate" style="max-width: 140px; cursor: pointer;" {% if exp.payee %}title="{{ exp.payee }}" onclick="this.classList.toggle('text-truncate')"{% endif %}>{{ exp.payee or '-' }}</td>
+                            <td class="text-truncate" style="max-width: 200px; cursor: pointer;" {% if exp.description %}title="{{ exp.description }}" onclick="this.classList.toggle('text-truncate')"{% endif %}>{{ exp.description or '-' }}</td>
                             <td>
                                 {% if exp.payment_mode %}
                                     {% set payment_color = PAYMENT_METHOD_COLORS.get(exp.payment_mode, '#475569') %}

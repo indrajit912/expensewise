@@ -134,8 +134,8 @@
                                             {{ exp.category }}
                                         </span>
                                     </td>
-                                    <td class="text-truncate" style="max-width: 120px;">{{ exp.payee or '-' }}</td>
-                                    <td class="text-truncate" style="max-width: 180px;">{{ exp.description or '-' }}</td>
+                                    <td class="text-truncate" style="max-width: 120px; cursor: pointer;" {% if exp.payee %}title="{{ exp.payee }}" onclick="this.classList.toggle('text-truncate')"{% endif %}>{{ exp.payee or '-' }}</td>
+                                    <td class="text-truncate" style="max-width: 180px; cursor: pointer;" {% if exp.description %}title="{{ exp.description }}" onclick="this.classList.toggle('text-truncate')"{% endif %}>{{ exp.description or '-' }}</td>
                                     <td class="text-end fw-semibold">
                                         <div>{{ exp.amount | currency_format(current_user.default_currency) }}</div>
                                         {% if exp.original_currency != current_user.default_currency %}

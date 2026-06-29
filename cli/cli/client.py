@@ -256,7 +256,7 @@ class APIClient:
         }
         return requests.get(url, params=params, headers=self.get_headers())
 
-    def get_analytics_trends(self, category='', start_date='', end_date=''):
+    def get_analytics_trends(self, category='', start_date='', end_date='', months=None):
         """Retrieves category distributions and histories with filters."""
         url = f"{self.api_url}/v1/analytics/trends"
         params = {
@@ -264,6 +264,8 @@ class APIClient:
             'start_date': start_date,
             'end_date': end_date
         }
+        if months is not None:
+            params['months'] = months
         return requests.get(url, params=params, headers=self.get_headers())
 
     def get_analytics_forecast(self):

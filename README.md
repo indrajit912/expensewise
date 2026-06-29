@@ -332,13 +332,76 @@ expensewise-cli logout --revoke
   ```bash
   expensewise-cli list --category=Food --start-date=2026-06-01 --end-date=2026-06-30
   ```
-* **Record a transaction:**
+* **Record a transaction (Interactive Mode):**
   ```bash
-  expensewise-cli add --amount=450.00 --category=Food --payee="Walmart"
+  expensewise-cli add --amount 1250
   ```
-* **Modify fields on a record:**
+  `--amount` is the only required command-line parameter. The CLI will collect all remaining fields interactively:
+  * **Transaction Date**: Prompts with today's date as default. Press **Enter** to accept it, or type a custom date (`YYYY-MM-DD`).
+  * **Category**: Displays a numbered menu of your categories. Select by number index, exact name, or partial search query.
+  * **Payment Mode**: Displays a numbered menu of payment channels. Select by number index, exact name, or partial search query.
+  * **Payee & Description**: Optional text prompts. Press **Enter** to leave them blank.
+
+  *Example Interactive Flow:*
+  ```text
+  Transaction Date [YYYY-MM-DD] (default: 2026-06-29): [Enter]
+  
+  Select Category:
+    1) Food
+    2) Travel
+  Choose category (enter number or name): 1
+  
+  Select Payment Mode:
+    1) Cash
+    2) Credit Card
+  Choose payment mode (enter number or name): 2
+  
+  Enter Payee Name (optional): Walmart
+  Enter Description/Notes (optional): Weekly grocery run
+  ```
+
+* **Record a transaction (Scripting Mode):**
+  For automation or scripts, provide all parameters directly on the command line to completely bypass interactive prompts:
   ```bash
-  expensewise-cli update <UUID> --amount=520.00 --description="Weekly shopping run"
+  expensewise-cli add --amount 450.00 --category Food --date-str 2026-06-28 --payee "Walmart" --mode Cash --description "Weekly snacks"
+  ```
+* **Modify fields on a record (Interactive Flags Mode):**
+  ```bash
+  expensewise-cli update --uuid <UUID> --amount --category
+  ```
+  `--uuid` is the only required option. The remaining parameters are **boolean flags** indicating which fields to modify interactively. For every flag specified, the CLI displays the current value and prompts for the new value:
+  * `--amount`: Flag to change the monetary amount.
+  * `--category`: Flag to select a different category from a numbered list.
+  * `--date-str`: Flag to input a new transaction date (`YYYY-MM-DD`).
+  * `--payee`: Flag to enter a new payee name.
+  * `--mode`: Flag to select a different payment channel from a numbered list.
+  * `--description`: Flag to update description/notes.
+
+  *Example Interactive Flow:*
+  ```text
+  $ expensewise-cli update --uuid 8a4c107f-7bde-4e3b-b7fb-6cb1a8c081e2 --amount --payee
+  
+  +--- Current Transaction Details --------------------+
+  | Category:    Food                                  |
+  | Amount:      150.00                                |
+  | Date:        2026-06-29                            |
+  | Payee:       None                                  |
+  | Mode:        Cash                                  |
+  | Description: None                                  |
+  +----------------------------------------------------+
+  
+  Amount [Current: 150.0]: 165.50
+  Payee [Current: ]: Walmart
+  
+  Summary of Proposed Changes:
+  +---------------+----------------+-----------+
+  | Field         | Original Value | New Value |
+  +---------------+----------------+-----------+
+  | Amount        | 150.0          | 165.5     |
+  | Payee         |                | Walmart   |
+  +---------------+----------------+-----------+
+  Do you want to save these modifications? [Y/n]: y
+  Success! Transaction updated successfully. Modified fields: Amount, Payee.
   ```
 * **Delete a record:**
   ```bash
@@ -429,6 +492,16 @@ Display spending summaries, rolling financial indicators, and forecast projectio
 
 ![CLI Category Distribution Chart](docs/images/cli/cli-chart.png)
 *Figure 6: CLI-generated spending distribution bar charts using Unicode block elements and custom-coded colors.*
+
+* **Generate monthly expense trends and next month prediction chart:**
+  ```bash
+  expensewise-cli chart monthly
+  expensewise-cli chart monthly --months 12
+  ```
+  Displays historical monthly expenses over a customized lookback window (defaults to 6 months) alongside a regression prediction for the next month's total spending. The output utilizes a colorful, console-optimized terminal bar chart to highlight historical vs. predicted metrics.
+
+  ![CLI Monthly Trends & Next Month Prediction](docs/images/cli/chart-monthly.png)
+  *Figure 7: CLI-generated monthly trends chart comparing historical totals with next month's projected expense forecast.*
 
 ---
 

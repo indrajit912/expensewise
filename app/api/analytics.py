@@ -184,7 +184,11 @@ def api_analytics_trends():
         if category_filter:
             category_dist = {k: v for k, v in category_dist.items() if k.lower() == category_filter.lower()}
             
-        history = AnalyticsService.get_monthly_spending_history(user_id, months_back=6)
+        try:
+            months_back = int(request.args.get('months', '6').strip())
+        except ValueError:
+            months_back = 6
+        history = AnalyticsService.get_monthly_spending_history(user_id, months_back=months_back)
         daily_labels, daily_values = AnalyticsService.get_daily_trend(user_id, days=30)
         
         return jsonify({

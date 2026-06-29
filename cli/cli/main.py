@@ -74,7 +74,22 @@ def show_custom_help():
  │                                     EXPENSEWISE CLI                                    │
  └────────────────────────────────────────────────────────────────────────────────────────┘
 [/]"""
-    console.print(banner, justify="center")
+    import sys
+    try:
+        encoding = sys.stdout.encoding or 'utf-8'
+        banner.encode(encoding)
+        console.print(banner, justify="center")
+    except Exception:
+        fallback_banner = r"""[bold bright_cyan]
++--------------------------------------------------------+
+|                                                        |
+|                      EXPENSEWISE                       |
+|                                                        |
+|                    ExpenseWise CLI                     |
+|                                                        |
++--------------------------------------------------------+
+[/]"""
+        console.print(fallback_banner, justify="center")
     console.print("\n[bold white]Secure personal finance administration directly from your terminal.[/]")
     console.print("[dim white]All actions communicate securely with the versioned REST API.[/]\n")
     
@@ -138,9 +153,9 @@ def show_custom_help():
         "  expensewise-cli login\n"
         "  expensewise-cli auth status\n\n"
         "[bold yellow]Manage expenses:[/]\n"
-        "  expensewise-cli add --amount 150.0 --category Food\n"
+        "  expensewise-cli add --amount 150.0\n"
         "  expensewise-cli list --category Food --start-date 2026-01-01\n"
-        "  expensewise-cli update <uuid> --amount 145.5\n\n"
+        "  expensewise-cli update --uuid <uuid> --amount\n\n"
         "[bold yellow]Budget tracking:[/]\n"
         "  expensewise-cli budget-set --month 2026-06 --category Rent --amount 1500\n"
         "  expensewise-cli budget-show --month 2026-06\n\n"
@@ -185,6 +200,22 @@ def show_auth_help():
     
     console.print(Panel(table, title="[bold cyan]Authentication Commands[/]", border_style="dim blue", title_align="left"))
 
+def show_chart_help():
+    console.print("[bold bright_cyan]ExpenseWise CLI - Charting Options[/]\n")
+    console.print("Generates colorful terminal-based spending charts.\n")
+    
+    table = Table(box=None, show_header=False, padding=(0, 1, 0, 0))
+    table.add_column("Command / Option", style="bold green", width=25)
+    table.add_column("Description", style="white")
+    table.add_row("(default)", "Visualizes category spending distribution for a date range.")
+    table.add_row("monthly", "Displays monthly spending trends and the forecast prediction for the next month.")
+    
+    console.print(Panel(table, title="[bold cyan]Chart Commands[/]", border_style="dim blue", title_align="left"))
+    
+    examples = SUBCOMMAND_EXAMPLES.get('chart', "")
+    if examples:
+        console.print(Panel(examples, title="[bold cyan]Usage Examples[/]", border_style="dim blue", title_align="left"))
+
 SUBCOMMAND_EXAMPLES = {
     'self-update': (
         "  expensewise-cli self-update\n"
@@ -219,14 +250,15 @@ SUBCOMMAND_EXAMPLES = {
         "  # Lists expenses filtered by category and date range."
     ),
     'add': (
-        "  expensewise-cli add --amount 45.90 --category Shopping\n"
-        "  # Creates a new expense entry.\n\n"
-        "  expensewise-cli add --amount 12.0 --category Transport --payee 'Uber' --mode 'Credit Card'"
+        "  expensewise-cli add --amount 1250.00\n"
+        "  # Launches interactive prompts to collect date, category, mode, payee, and description.\n\n"
+        "  expensewise-cli add --amount 12.0 --category Transport --payee 'Uber' --mode 'Credit Card' --description 'Work trip'"
     ),
     'update': (
-        "  expensewise-cli update <uuid> --amount 50.0\n"
-        "  # Modifies amount of the target transaction.\n\n"
-        "  expensewise-cli update <uuid> --description 'Updated description'"
+        "  expensewise-cli update --uuid <uuid> --amount\n"
+        "  # Interactively modifies amount of the target transaction.\n\n"
+        "  expensewise-cli update --uuid <uuid> --payee --description\n"
+        "  # Interactively modifies payee and description values."
     ),
     'delete': (
         "  expensewise-cli delete <uuid>\n"
@@ -294,7 +326,17 @@ SUBCOMMAND_EXAMPLES = {
     ),
     'chart': (
         "  expensewise-cli chart --start-date 2026-01-01 --end-date 2026-03-31\n"
-        "  # Visualizes spending shares distribution via a colorful Unicode block chart."
+        "  # Visualizes spending shares distribution via a colorful Unicode block chart.\n\n"
+        "  expensewise-cli chart monthly\n"
+        "  # Displays monthly historical totals and the regression forecast prediction.\n\n"
+        "  expensewise-cli chart monthly --months 12\n"
+        "  # Customizes range to show the last 12 months."
+    ),
+    'monthly': (
+        "  expensewise-cli chart monthly\n"
+        "  # Displays 6-month historical totals and next month prediction.\n\n"
+        "  expensewise-cli chart monthly --months 12\n"
+        "  # Customizes range to show the last 12 months."
     ),
     'export-backup': (
         "  expensewise-cli export-backup backup.json\n"
@@ -349,7 +391,7 @@ class CustomHelpCommand(click.Command):
                 else:
                     type_str = f"<{param.type.name.upper()}>" if hasattr(param.type, 'name') else ""
                 required_str = " [red][Required][/]" if param.required else " [dim][Optional][/]"
-                default_str = f" [yellow](Default: {param.default})[/]" if param.default is not None and not isinstance(param.default, click.utils.LazyType) and not callable(param.default) else ""
+                default_str = f" [yellow](Default: {param.default})[/]" if param.default is not None and not callable(param.default) else ""
                 
                 desc = (param.help or "") + required_str + default_str
                 options.append((f"{opt_names} {type_str}", desc))
@@ -387,6 +429,9 @@ class CustomHelpGroup(click.Group):
             ctx.exit()
         elif self.name == 'auth':
             show_auth_help()
+            ctx.exit()
+        elif self.name == 'chart':
+            show_chart_help()
             ctx.exit()
         else:
             show_custom_help()
@@ -849,10 +894,52 @@ def list_expenses(search, category, start_date, end_date):
         page += 1
 
 
+def prompt_selection(items, item_type_label, creation_cmd_example):
+    """Interactively prompts the user to select an item from a list of dicts."""
+    if not items:
+        console.print(f"[bold yellow]No {item_type_label}s found. Please create one first using 'expensewise-cli {creation_cmd_example}'.[/]")
+        return None
+        
+    if len(items) == 1:
+        selected_name = items[0]['name']
+        console.print(f"Only one {item_type_label} available. Automatically selected: [bold cyan]{selected_name}[/]")
+        return selected_name
+        
+    console.print(f"\n[bold cyan]Select {item_type_label.title()}:[/]")
+    for idx, item in enumerate(items, 1):
+        console.print(f"  [bold green]{idx})[/] {item['name']}")
+        
+    from rich.prompt import Prompt
+    num_map = {str(i): item['name'] for i, item in enumerate(items, 1)}
+    name_map = {item['name'].lower(): item['name'] for item in items}
+    
+    while True:
+        choice = Prompt.ask(f"Choose {item_type_label} (enter number or name)").strip()
+        if not choice:
+            continue
+            
+        if choice in num_map:
+            return num_map[choice]
+            
+        choice_lower = choice.lower()
+        if choice_lower in name_map:
+            return name_map[choice_lower]
+            
+        partial_matches = [item['name'] for item in items if choice_lower in item['name'].lower()]
+        if len(partial_matches) == 1:
+            matched_name = partial_matches[0]
+            console.print(f"Matched: [bold green]{matched_name}[/]")
+            return matched_name
+        elif len(partial_matches) > 1:
+            console.print(f"[yellow]Multiple matches found: {', '.join(partial_matches)}. Please be more specific.[/]")
+        else:
+            console.print("[bold red]Invalid selection. Try again.[/]")
+
+
 @cli.command(cls=CustomHelpCommand)
-@click.option('--amount', prompt=True, type=float, help='Money spent')
-@click.option('--category', prompt=True, help='Category name')
-@click.option('--date-str', default=lambda: date.today().isoformat(), prompt='Date (YYYY-MM-DD)', help='Transaction date')
+@click.option('--amount', required=True, type=float, help='Money spent')
+@click.option('--category', default='', help='Category name')
+@click.option('--date-str', default='', help='Transaction date (YYYY-MM-DD)')
 @click.option('--payee', default='', help='Merchant recipient')
 @click.option('--mode', default='', help='Payment channel')
 @click.option('--description', default='', help='Notes/Message')
@@ -860,6 +947,52 @@ def add(amount, category, date_str, payee, mode, description):
     """Adds a new expense record."""
     check_login()
     
+    ctx = click.get_current_context()
+    is_date_str_provided = ctx.get_parameter_source('date_str') == click.core.ParameterSource.COMMANDLINE
+    is_category_provided = ctx.get_parameter_source('category') == click.core.ParameterSource.COMMANDLINE
+    is_mode_provided = ctx.get_parameter_source('mode') == click.core.ParameterSource.COMMANDLINE
+    is_payee_provided = ctx.get_parameter_source('payee') == click.core.ParameterSource.COMMANDLINE
+    is_description_provided = ctx.get_parameter_source('description') == click.core.ParameterSource.COMMANDLINE
+    
+    # 1. Resolve date
+    if not is_date_str_provided or not date_str:
+        from rich.prompt import Prompt
+        from datetime import date
+        today_str = date.today().isoformat()
+        date_str = Prompt.ask("Transaction Date [YYYY-MM-DD]", default=today_str)
+        
+    # 2. Resolve category
+    if not is_category_provided or not category:
+        res_cat = client.list_categories()
+        if res_cat.status_code != 200:
+            console.print("[bold red]Failed to retrieve categories from the server.[/]")
+            return
+        categories = res_cat.json()
+        category = prompt_selection(categories, "category", "add-category")
+        if not category:
+            return
+            
+    # 3. Resolve payment mode
+    if not is_mode_provided or not mode:
+        res_pm = client.list_payment_methods()
+        if res_pm.status_code != 200:
+            console.print("[bold red]Failed to retrieve payment channels from the server.[/]")
+            return
+        pms = res_pm.json()
+        mode = prompt_selection(pms, "payment mode", "add-payment")
+        if not mode:
+            return
+            
+    # 4. Resolve payee
+    if not is_payee_provided:
+        from rich.prompt import Prompt
+        payee = Prompt.ask("Enter Payee Name (optional)", default="").strip()
+        
+    # 5. Resolve description
+    if not is_description_provided:
+        from rich.prompt import Prompt
+        description = Prompt.ask("Enter Description/Notes (optional)", default="").strip()
+        
     payee_val = payee.strip() or None
     mode_val = mode.strip() or None
     desc_val = description.strip() or None
@@ -873,41 +1006,148 @@ def add(amount, category, date_str, payee, mode, description):
 
 
 @cli.command(cls=CustomHelpCommand)
-@click.argument('uuid_str')
-@click.option('--amount', type=float, help='Update amount')
-@click.option('--category', help='Update category')
-@click.option('--date-str', help='Update date (YYYY-MM-DD)')
-@click.option('--payee', help='Update payee')
-@click.option('--mode', help='Update payment mode')
-@click.option('--description', help='Update description')
-def update(uuid_str, amount, category, date_str, payee, mode, description):
+@click.option('--uuid', required=True, help='Transaction UUID to update')
+@click.option('--amount', is_flag=True, help='Flag to update amount')
+@click.option('--category', is_flag=True, help='Flag to update category')
+@click.option('--date-str', is_flag=True, help='Flag to update date (YYYY-MM-DD)')
+@click.option('--payee', is_flag=True, help='Flag to update payee')
+@click.option('--mode', is_flag=True, help='Flag to update payment mode')
+@click.option('--description', is_flag=True, help='Flag to update description')
+def update(uuid, amount, category, date_str, payee, mode, description):
     """Updates fields of an existing expense by UUID."""
     check_login()
     
+    # Verify at least one modification flag is specified
+    if not any([amount, category, date_str, payee, mode, description]):
+        console.print("[yellow]No modification flags specified. Specify at least one flag (e.g. --amount, --category) to update.[/]")
+        return
+        
+    res = client.get_expense(uuid)
+    if res.status_code != 200:
+        console.print(f"[bold red]Error:[/] Transaction not found for UUID: {uuid}")
+        return
+    expense = res.json()
+    
+    # Print current details
+    console.print(Panel(
+        f"[bold white]Category:[/]    {expense.get('category')}\n"
+        f"[bold white]Amount:[/]      {expense.get('amount')}\n"
+        f"[bold white]Date:[/]        {expense.get('expense_date')}\n"
+        f"[bold white]Payee:[/]       {expense.get('payee') or 'None'}\n"
+        f"[bold white]Mode:[/]        {expense.get('payment_mode') or 'None'}\n"
+        f"[bold white]Description:[/] {expense.get('description') or 'None'}",
+        title="[bold green]Current Transaction Details[/]",
+        border_style="cyan"
+    ))
+    
     payload = {}
-    if amount is not None:
-        payload['amount'] = amount
-    if category:
-        payload['category'] = category
+    from rich.prompt import Prompt
+    
+    # 1. Amount prompt
+    if amount:
+        current_amt = expense.get('amount')
+        new_amt_str = Prompt.ask(f"Amount [Current: {current_amt}]", default=str(current_amt), show_default=False)
+        try:
+            new_amt = float(new_amt_str)
+            if new_amt <= 0:
+                raise ValueError
+        except ValueError:
+            console.print("[bold red]Invalid amount. Must be a positive number.[/]")
+            return
+        payload['amount'] = new_amt
+        
+    # 2. Date prompt
     if date_str:
-        payload['expense_date'] = date_str
-    if payee is not None:
-        payload['payee'] = payee.strip() or None
+        current_date = expense.get('expense_date')
+        new_date = Prompt.ask(f"Date [Current: {current_date}]", default=str(current_date), show_default=False)
+        from datetime import datetime
+        try:
+            datetime.strptime(new_date, "%Y-%m-%d")
+        except ValueError:
+            console.print("[bold red]Invalid date format. Must be YYYY-MM-DD.[/]")
+            return
+        payload['expense_date'] = new_date
+        
+    # 3. Category prompt
+    if category:
+        current_cat = expense.get('category')
+        console.print(f"\nCurrent Category: [bold cyan]{current_cat}[/]")
+        res_cat = client.list_categories()
+        if res_cat.status_code != 200:
+            console.print("[bold red]Failed to retrieve categories from the server.[/]")
+            return
+        categories = res_cat.json()
+        new_cat = prompt_selection(categories, "category", "add-category")
+        if not new_cat:
+            return
+        payload['category'] = new_cat
+        
+    # 4. Payment Mode prompt
     if mode:
-        payload['payment_mode'] = mode
-    if description is not None:
-        payload['description'] = description.strip() or None
+        current_mode = expense.get('payment_mode') or "None"
+        console.print(f"\nCurrent Payment Mode: [bold cyan]{current_mode}[/]")
+        res_pm = client.list_payment_methods()
+        if res_pm.status_code != 200:
+            console.print("[bold red]Failed to retrieve payment channels from the server.[/]")
+            return
+        pms = res_pm.json()
+        new_mode = prompt_selection(pms, "payment mode", "add-payment")
+        if not new_mode:
+            return
+        payload['payment_mode'] = new_mode
+        
+    # 5. Payee prompt
+    if payee:
+        current_payee = expense.get('payee') or ""
+        new_payee = Prompt.ask(f"Payee [Current: {current_payee}]", default=current_payee, show_default=False).strip()
+        payload['payee'] = new_payee or None
+        
+    # 6. Description prompt
+    if description:
+        current_desc = expense.get('description') or ""
+        new_desc = Prompt.ask(f"Description [Current: {current_desc}]", default=current_desc, show_default=False).strip()
+        payload['description'] = new_desc or None
 
     if not payload:
-        console.print("[yellow]No modifications specified. Specify at least one field parameter.[/]")
+        console.print("[yellow]No changes made.[/]")
         return
-
-    response = client.update_expense(uuid_str, payload)
+        
+    # Summarize changes
+    console.print("\n[bold cyan]Summary of Proposed Changes:[/]")
+    table = Table(border_style="cyan")
+    table.add_column("Field", style="bold yellow")
+    table.add_column("Original Value", style="dim white")
+    table.add_column("New Value", style="bold green")
+    
+    key_mapping = {
+        'amount': ('Amount', 'amount'),
+        'expense_date': ('Date', 'expense_date'),
+        'category': ('Category', 'category'),
+        'payment_mode': ('Payment Mode', 'payment_mode'),
+        'payee': ('Payee', 'payee'),
+        'description': ('Description', 'description')
+    }
+    
+    for payload_key, new_val in payload.items():
+        label, orig_key = key_mapping[payload_key]
+        orig_val = expense.get(orig_key)
+        table.add_row(label, str(orig_val), str(new_val))
+        
+    console.print(table)
+    
+    from rich.prompt import Confirm
+    if not Confirm.ask("Do you want to save these modifications?", default=True):
+        console.print("[yellow]Update canceled.[/]")
+        return
+        
+    response = client.update_expense(uuid, payload)
     if response.status_code == 200:
-        console.print("[bold green]Success![/] Expense record updated.")
+        updated_fields = ", ".join(key_mapping[k][0] for k in payload.keys())
+        console.print(f"[bold green]Success![/]")
+        console.print(f"Transaction updated successfully. Modified fields: [bold]{updated_fields}[/].")
     else:
         err = response.json().get('message', 'Update failed.')
-        console.print(f"[bold red]Failed to update:[/] {err}")
+        console.print(f"[bold red]Failed to update transaction:[/] {err}")
 
 
 @cli.command(cls=CustomHelpCommand)
@@ -1440,43 +1680,115 @@ def display_analytics_alias(ctx, start_date, end_date, category, category_wise):
     ctx.invoke(display_summary, start_date=start_date, end_date=end_date, category=category, category_wise=category_wise)
 
 
-@cli.command(name='chart', cls=CustomHelpCommand)
+@cli.group(name='chart', invoke_without_command=True, cls=CustomHelpGroup)
 @click.option('--category', default='', help='Filter by category name')
 @click.option('--start-date', default='', help='Format: YYYY-MM-DD')
 @click.option('--end-date', default='', help='Format: YYYY-MM-DD')
-def display_chart(category, start_date, end_date):
+@click.pass_context
+def chart_group(ctx, category, start_date, end_date):
     """Generates colorful terminal-based spending charts."""
+    if ctx.invoked_subcommand is None:
+        check_login()
+        
+        res = client.get_analytics_trends(category=category, start_date=start_date, end_date=end_date)
+        if res.status_code != 200:
+            console.print("[bold red]Failed to retrieve chart analytics metrics.[/]")
+            return
+            
+        data = res.json()
+        group_data = data.get('category_distribution', {})
+        
+        if not group_data:
+            console.print("[yellow]No expense data found in the specified range.[/]")
+            return
+            
+        total_spent = sum(group_data.values())
+        
+        currency = data.get('default_currency', 'USD')
+        symbol = get_currency_symbol(currency)
+
+        console.print(Panel(
+            f"[bold]Spending Distribution Chart[/]\n"
+            f"Total Filtered Spending: [bold green]{symbol}{total_spent:,.2f}[/]",
+            border_style="cyan"
+        ))
+
+        # Plot custom terminal bar/pie representation
+        max_cat_len = max(len(c) for c in group_data.keys()) if group_data else 10
+        sorted_groups = sorted(group_data.items(), key=lambda x: x[1], reverse=True)
+        
+        max_amt = max(group_data.values()) if group_data else 1.0
+
+        try:
+            import sys
+            "█░".encode(sys.stdout.encoding or 'utf-8')
+            bar_char_filled = "█"
+            bar_char_empty = "░"
+        except Exception:
+            bar_char_filled = "#"
+            bar_char_empty = "-"
+
+        for cat, amt in sorted_groups:
+            pct = (amt / total_spent) * 100 if total_spent > 0 else 0
+            # Normalize to a bar width of 30 characters
+            bar_len = int((amt / max_amt) * 30) if max_amt > 0 else 0
+            bar = bar_char_filled * bar_len + bar_char_empty * (30 - bar_len)
+            
+            color_map = ["red", "green", "yellow", "blue", "magenta", "cyan"]
+            idx = sorted_groups.index((cat, amt)) % len(color_map)
+            color = color_map[idx]
+            
+            console.print(
+                f"[bold {color}]{cat.ljust(max_cat_len)}[/] | "
+                f"[{color}]{bar}[/] | "
+                f"[bold]{symbol}{amt:,.2f}[/] ({pct:.1f}%)"
+            )
+
+
+@chart_group.command(name='monthly', cls=CustomHelpCommand)
+@click.option('--months', default=6, type=int, help='Number of historical months to include')
+def chart_monthly(months):
+    """Displays monthly spending trends and the forecast prediction for the next month."""
     check_login()
     
-    res = client.get_analytics_trends(category=category, start_date=start_date, end_date=end_date)
-    if res.status_code != 200:
-        console.print("[bold red]Failed to retrieve chart analytics metrics.[/]")
+    # 1. Fetch trends (monthly history)
+    trends_res = client.get_analytics_trends(months=months)
+    if trends_res.status_code != 200:
+        console.print("[bold red]Failed to retrieve historical monthly trends.[/]")
         return
         
-    data = res.json()
-    group_data = data.get('category_distribution', {})
-    
-    if not group_data:
-        console.print("[yellow]No expense data found in the specified range.[/]")
-        return
-        
-    total_spent = sum(group_data.values())
-    
-    currency = data.get('default_currency', 'USD')
+    trends_data = trends_res.json()
+    history = trends_data.get('monthly_history', {})
+    currency = trends_data.get('default_currency', 'USD')
     symbol = get_currency_symbol(currency)
-
+    
+    if not history:
+        console.print("[yellow]Insufficient historical data to construct trends chart.[/]")
+        return
+        
+    # 2. Fetch forecast
+    forecast_res = client.get_analytics_forecast()
+    forecast_amt = None
+    if forecast_res.status_code == 200:
+        forecast_data = forecast_res.json()
+        forecast_amt = forecast_data.get('predicted_next_month_spending')
+        
+    # Sort history by period key (e.g. 2026-01)
+    sorted_history = sorted(history.items())
+    
     console.print(Panel(
-        f"[bold]Spending Distribution Chart[/]\n"
-        f"Total Filtered Spending: [bold green]{symbol}{total_spent:,.2f}[/]",
+        f"Currency: [yellow]{currency}[/] ({symbol})\n"
+        f"Historical Range: [bold]{months} months[/]",
+        title="[bold green]Monthly Expenses & Next Month Prediction[/]",
         border_style="cyan"
     ))
-
-    # Plot custom terminal bar/pie representation
-    max_cat_len = max(len(c) for c in group_data.keys()) if group_data else 10
-    sorted_groups = sorted(group_data.items(), key=lambda x: x[1], reverse=True)
     
-    max_amt = max(group_data.values()) if group_data else 1.0
-
+    # Determine the maximum amount for normalization
+    amounts = [v for k, v in sorted_history]
+    if forecast_amt is not None:
+        amounts.append(forecast_amt)
+    max_amt = max(amounts) if amounts else 1.0
+    
     try:
         import sys
         "█░".encode(sys.stdout.encoding or 'utf-8')
@@ -1485,22 +1797,53 @@ def display_chart(category, start_date, end_date):
     except Exception:
         bar_char_filled = "#"
         bar_char_empty = "-"
-
-    for cat, amt in sorted_groups:
-        pct = (amt / total_spent) * 100 if total_spent > 0 else 0
-        # Normalize to a bar width of 30 characters
+        
+    # Print historical months
+    for month_period, amt in sorted_history:
         bar_len = int((amt / max_amt) * 30) if max_amt > 0 else 0
         bar = bar_char_filled * bar_len + bar_char_empty * (30 - bar_len)
-        
-        color_map = ["red", "green", "yellow", "blue", "magenta", "cyan"]
-        idx = sorted_groups.index((cat, amt)) % len(color_map)
-        color = color_map[idx]
-        
         console.print(
-            f"[bold {color}]{cat.ljust(max_cat_len)}[/] | "
-            f"[{color}]{bar}[/] | "
-            f"[bold]{symbol}{amt:,.2f}[/] ({pct:.1f}%)"
+            f"[bold blue]{month_period.ljust(12)}[/] | "
+            f"[blue]{bar}[/] | "
+            f"[bold]{symbol}{amt:,.2f}[/] (Historical)"
         )
+        
+    # Print prediction if available
+    if forecast_amt is not None:
+        from datetime import datetime, timedelta
+        # Estimate next month string
+        try:
+            last_month_str = sorted_history[-1][0]
+            last_date = datetime.strptime(last_month_str + "-01", "%Y-%m-%d")
+            next_date = last_date + timedelta(days=32)
+            next_month_str = next_date.strftime("%Y-%m")
+        except Exception:
+            next_month_str = "Next Month (Pred)"
+            
+        bar_len = int((forecast_amt / max_amt) * 30) if max_amt > 0 else 0
+        bar = bar_char_filled * bar_len + bar_char_empty * (30 - bar_len)
+        console.print(
+            f"[bold magenta]{next_month_str.ljust(12)}[/] | "
+            f"[magenta]{bar}[/] | "
+            f"[bold magenta]{symbol}{forecast_amt:,.2f}[/] [bold](Predicted)[/]"
+        )
+    else:
+        console.print("\n[yellow]Note: Insufficient historical data points to generate next month linear forecast.[/]")
+        
+    # Legend
+    try:
+        import sys
+        "■".encode(sys.stdout.encoding or 'utf-8')
+        legend_sym = "■"
+    except Exception:
+        legend_sym = "#"
+        
+    console.print(Panel(
+        f"[bold blue]{legend_sym}[/] Historical Expenses    [bold magenta]{legend_sym}[/] Predicted Expense",
+        title="Legend",
+        border_style="dim cyan",
+        expand=False
+    ))
 
 
 if __name__ == '__main__':

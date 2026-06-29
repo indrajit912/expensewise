@@ -11,35 +11,51 @@ class AnalyticsService:
 
     @staticmethod
     def get_user_expenses_df(user_id, start_date=None, end_date=None):
-        """Helper to load user expenses into a Pandas DataFrame."""
-        expenses = Expense.query.filter_by(user_id=user_id).all()
-        if not expenses:
-            return pd.DataFrame()
+        """Helper to load user expenses into a Pandas DataFrame, cached per Flask request context."""
+        from flask import has_request_context, g
+        
+        df = None
+        if has_request_context():
+            cache_key = f"_user_expenses_df_{user_id}"
+            if hasattr(g, cache_key):
+                df = getattr(g, cache_key)
+                
+        if df is None:
+            expenses = Expense.query.filter_by(user_id=user_id).all()
+            if not expenses:
+                df = pd.DataFrame()
+            else:
+                data = []
+                for e in expenses:
+                    try:
+                        e_date = e.expense_date
+                        if not e_date:
+                            continue
+                        data.append({
+                            'amount': float(e.amount) if e.amount else 0.0,
+                            'category': e.category or 'Other',
+                            'expense_date': pd.to_datetime(e_date),
+                            'payee': e.payee or '',
+                            'payment_mode': e.payment_mode or ''
+                        })
+                    except Exception:
+                        continue
+                df = pd.DataFrame(data)
+                
+            if has_request_context():
+                setattr(g, cache_key, df)
+                
+        if df.empty:
+            return df
             
-        data = []
-        for e in expenses:
-            try:
-                e_date = e.expense_date
-                if not e_date:
-                    continue
-                
-                # Apply date filters in Python since DB fields are encrypted
-                if start_date and e_date < start_date:
-                    continue
-                if end_date and e_date > end_date:
-                    continue
-                    
-                data.append({
-                    'amount': float(e.amount) if e.amount else 0.0,
-                    'category': e.category or 'Other',
-                    'expense_date': pd.to_datetime(e_date),
-                    'payee': e.payee or '',
-                    'payment_mode': e.payment_mode or ''
-                })
-            except Exception:
-                continue
-                
-        return pd.DataFrame(data)
+        # Apply date filters to the cached DataFrame
+        filtered_df = df
+        if start_date:
+            filtered_df = filtered_df[filtered_df['expense_date'] >= pd.to_datetime(start_date)]
+        if end_date:
+            filtered_df = filtered_df[filtered_df['expense_date'] <= pd.to_datetime(end_date)]
+            
+        return filtered_df
 
     @classmethod
     def get_summary_metrics(cls, user_id):

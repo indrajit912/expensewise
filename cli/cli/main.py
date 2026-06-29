@@ -26,7 +26,7 @@ class StyledConsole(Console):
             msg = msg.replace("[bold red]Failed to export:[/]", "[bold red]✘ Failed to export:[/]")
             msg = msg.replace("[bold red]Failed to read JSON:[/]", "[bold red]✘ Failed to read JSON:[/]")
             msg = msg.replace("[bold red]Failed to restore:[/]", "[bold red]✘ Failed to restore:[/]")
-            msg = msg.replace("[bold red]Failed to retrieve spending summary metrics.[/]", "[bold red]✘ Failed to retrieve spending summary metrics.[/]")
+            msg = msg.replace("[bold red]Failed to retrieve spending analytics metrics.[/]", "[bold red]✘ Failed to retrieve spending analytics metrics.[/]")
             msg = msg.replace("[bold red]Failed to retrieve chart analytics metrics.[/]", "[bold red]✘ Failed to retrieve chart analytics metrics.[/]")
             msg = msg.replace("[bold red]Failed to retrieve categories.[/]", "[bold red]✘ Failed to retrieve categories.[/]")
             msg = msg.replace("[bold red]Failed to retrieve payment channels.[/]", "[bold red]✘ Failed to retrieve payment channels.[/]")
@@ -136,8 +136,8 @@ def show_custom_help():
     ])
 
     print_section_table("Analytics & Reports", [
-        ("summary", "Display range-filtered spending metrics"),
-        ("analytics", "Alias for 'summary' command"),
+        ("analytics", "Display range-filtered spending metrics"),
+        ("summary", "Legacy alias for 'analytics' command"),
         ("chart", "Plot distribution and trends using terminal charts")
     ])
 
@@ -160,7 +160,7 @@ def show_custom_help():
         "  expensewise-cli budget-set --month 2026-06 --category Rent --amount 1500\n"
         "  expensewise-cli budget-show --month 2026-06\n\n"
         "[bold yellow]Analytics and exports:[/]\n"
-        "  expensewise-cli summary --category-wise --start-date 2026-05-01\n"
+        "  expensewise-cli analytics --category-wise --start-date 2026-05-01\n"
         "  expensewise-cli chart --start-date 2026-05-01\n"
         "  expensewise-cli chart monthly --months 12\n"
         "  expensewise-cli export-backup my_backup.json"
@@ -315,15 +315,15 @@ SUBCOMMAND_EXAMPLES = {
         "  expensewise-cli budget-delete 2026-06 Rent\n"
         "  # Clears Rent limit configuration for June 2026."
     ),
-    'summary': (
-        "  expensewise-cli summary --start-date 2026-01-01 --end-date 2026-05-31\n"
+    'analytics': (
+        "  expensewise-cli analytics --start-date 2026-01-01 --end-date 2026-05-31\n"
         "  # Displays total spending, count, average transactions, and daily average.\n\n"
-        "  expensewise-cli summary --category-wise --start-date 2026-01-01\n"
+        "  expensewise-cli analytics --category-wise --start-date 2026-01-01\n"
         "  # Shows spending breakdown and ASCII shares chart by category."
     ),
-    'analytics': (
-        "  expensewise-cli analytics --category-wise --start-date 2026-01-01\n"
-        "  # Alias command for summary breakdown."
+    'summary': (
+        "  expensewise-cli summary --category-wise --start-date 2026-01-01\n"
+        "  # Legacy alias command for analytics breakdown."
     ),
     'chart': (
         "  expensewise-cli chart --start-date 2026-01-01 --end-date 2026-03-31\n"
@@ -1555,19 +1555,19 @@ def self_update():
 
 
 # ==============================================================================
-@cli.command(name='summary', cls=CustomHelpCommand)
+@cli.command(name='analytics', cls=CustomHelpCommand)
 @click.option('--start-date', default='', help='Format: YYYY-MM-DD')
 @click.option('--end-date', default='', help='Format: YYYY-MM-DD')
 @click.option('--category', default='', help='Filter by category name')
 @click.option('--category-wise', is_flag=True, help='Display category-wise spending breakdown table')
 @click.pass_context
-def display_summary(ctx, start_date, end_date, category, category_wise):
-    """Displays spending summaries over a specified date range and breakdown."""
+def display_analytics(ctx, start_date, end_date, category, category_wise):
+    """Displays spending summaries and breakdowns over a specified date range."""
     check_login()
     
     res = client.get_analytics_summary(category=category, start_date=start_date, end_date=end_date)
     if res.status_code != 200:
-        console.print("[bold red]Failed to retrieve spending summary metrics.[/]")
+        console.print("[bold red]Failed to retrieve spending analytics metrics.[/]")
         return
         
     data = res.json()
@@ -1670,15 +1670,15 @@ def display_summary(ctx, start_date, end_date, category, category_wise):
                 )
 
 
-@cli.command(name='analytics', cls=CustomHelpCommand)
+@cli.command(name='summary', cls=CustomHelpCommand)
 @click.option('--start-date', default='', help='Format: YYYY-MM-DD')
 @click.option('--end-date', default='', help='Format: YYYY-MM-DD')
 @click.option('--category', default='', help='Filter by category name')
 @click.option('--category-wise', is_flag=True, help='Display category-wise spending breakdown table')
 @click.pass_context
-def display_analytics_alias(ctx, start_date, end_date, category, category_wise):
-    """Alias for 'summary' command. Displays spending summaries and breakdowns."""
-    ctx.invoke(display_summary, start_date=start_date, end_date=end_date, category=category, category_wise=category_wise)
+def display_summary_alias(ctx, start_date, end_date, category, category_wise):
+    """Legacy alias for 'analytics' command. Displays spending summaries and breakdowns."""
+    ctx.invoke(display_analytics, start_date=start_date, end_date=end_date, category=category, category_wise=category_wise)
 
 
 @cli.group(name='chart', invoke_without_command=True, cls=CustomHelpGroup)

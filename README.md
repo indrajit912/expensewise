@@ -196,7 +196,20 @@ expensewise-cli list --category Food --start-date 2026-06-01
 expensewise-cli delete <UUID>
 ```
 
-#### 5. Chart Categories
+#### 5. Range-filtered Spending Analytics
+Query spending metrics, daily averages, transaction counts, and category breakdowns:
+```bash
+# Query analytics overview for the last 30 days
+expensewise-cli analytics
+
+# Query category-wise breakdown for a custom date range
+expensewise-cli analytics --category-wise --start-date 2026-01-01 --end-date 2026-05-31
+
+# Legacy alias command 'summary' is still supported for backward compatibility
+expensewise-cli summary --category-wise
+```
+
+#### 6. Chart Categories
 Plots a terminal-based bar chart of category distribution:
 ```bash
 expensewise-cli chart --start-date 2026-06-01 --end-date 2026-06-30
@@ -204,7 +217,7 @@ expensewise-cli chart --start-date 2026-06-01 --end-date 2026-06-30
 ![CLI Category Distribution Chart](docs/images/cli/cli-chart.png)
 *Figure 5: CLI-generated spending distribution bar charts using Unicode block elements and custom-coded colors.*
 
-#### 6. Chart Monthly Trends & Next Month Prediction
+#### 7. Chart Monthly Trends & Next Month Prediction
 Plots monthly historical expenses and integrates next month's forecast:
 ```bash
 expensewise-cli chart monthly
@@ -215,7 +228,7 @@ This calls the regression engine on the server to project the next month's spend
 ![CLI Monthly Trends & Next Month Prediction](docs/images/cli/chart-monthly.png)
 *Figure 6: CLI-generated monthly trends chart comparing historical totals with next month's projected expense forecast.*
 
-#### 7. Update CLI Client
+#### 8. Update CLI Client
 Keep your client updated to the latest code on GitHub interactively:
 ```bash
 expensewise-cli self-update

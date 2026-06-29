@@ -509,9 +509,103 @@ def config_reset():
 # USER MANAGEMENT COMMANDS
 # ==============================================================================
 
+SESSION_TIMEOUT_SECONDS = 3600  # 1 hour (modular session timeout duration)
+
 @cli.command(cls=CustomHelpCommand)
 def login():
     """Authenticates the terminal client session securely with the server."""
+    from datetime import datetime, timezone
+    import keyring
+    
+    # 1. Check existing session
+    session = client.load_session()
+    has_token = client.load_token()
+    
+    if session and has_token:
+        try:
+            parsed_timestamp = datetime.fromisoformat(session.get('login_timestamp'))
+        except Exception:
+            parsed_timestamp = None
+            
+        if parsed_timestamp:
+            elapsed = datetime.now(timezone.utc) - parsed_timestamp
+            elapsed_seconds = elapsed.total_seconds()
+            
+            # Format friendly elapsed duration string
+            if elapsed_seconds < 60:
+                elapsed_str = f"{int(elapsed_seconds)} seconds ago"
+            elif elapsed_seconds < 3600:
+                elapsed_str = f"{int(elapsed_seconds // 60)} minutes ago"
+            else:
+                hours = int(elapsed_seconds // 3600)
+                elapsed_str = f"{hours} hour ago" if hours == 1 else f"{hours} hours ago"
+                
+            if elapsed_seconds < SESSION_TIMEOUT_SECONDS:
+                res = client.get_profile()
+                if res.status_code == 200:
+                    data = res.json()
+                    console.print(f"[green]Previous login detected ({elapsed_str}). Session is still active.[/]")
+                    console.print(f"[bold green]Success![/] Welcome back, [bold]{data.get('name')}[/]. Reusing existing session.")
+                    return
+                else:
+                    client.clear_token()
+            else:
+                console.print(f"[yellow]Previous login detected ({elapsed_str}).[/]")
+                console.print("[yellow]Session has expired. Logging out the previous session...[/]")
+                
+                try:
+                    client.logout()
+                except Exception as e:
+                    console.print(f"[bold red]Logout Warning:[/] Local credentials cleared. ({str(e)})")
+                    client.clear_token()
+                    
+                console.print("[green]Signing you in again...[/]")
+                
+                method = session.get('login_method')
+                email = session.get('email')
+                
+                success = False
+                if method == "1" and email:
+                    password = keyring.get_password("expensewise", "login_password")
+                    if password:
+                        response = client.login(email, password)
+                        if response.status_code == 200:
+                            data = response.json()
+                            token = data.get('token')
+                            client.save_token(token)
+                            client.save_session("1", email)
+                            try:
+                                keyring.set_password("expensewise", "login_password", password)
+                            except Exception:
+                                pass
+                            console.print(f"[bold green]Login successful.[/] Welcome back, [bold]{data['user']['name']}[].")
+                            success = True
+                        else:
+                            err_msg = response.json().get('message', 'Credentials rejected.')
+                            console.print(f"[bold red]Automatic re-login failed:[/] {err_msg}")
+                    else:
+                        console.print("[bold red]Automatic re-login failed:[/] Password credentials not found in keyring.")
+                elif method == "2":
+                    token = keyring.get_password("expensewise", "api_token")
+                    if token:
+                        client.save_token(token)
+                        res = client.get_profile()
+                        if res.status_code == 200:
+                            data = res.json()
+                            client.save_session("2")
+                            console.print(f"[bold green]Login successful.[/] API Token verified. Logged in as [bold]{data.get('name')}[/].")
+                            success = True
+                        else:
+                            console.print("[bold red]Automatic re-login failed:[/] Stored API token is invalid or expired.")
+                    else:
+                        console.print("[bold red]Automatic re-login failed:[/] API Token not found in keyring.")
+                        
+                if success:
+                    return
+                else:
+                    console.print("[yellow]Proceeding to manual authentication portal...[/]\n")
+
+    # Proceed with normal login flow
     print_welcome_banner("ExpenseWise Authentication Portal")
     console.print(Panel(
         "Select an Authentication Method:\n"
@@ -535,6 +629,11 @@ def login():
             data = response.json()
             token = data.get('token')
             client.save_token(token)
+            client.save_session("1", email)
+            try:
+                keyring.set_password("expensewise", "login_password", password)
+            except Exception:
+                pass
             console.print(f"[bold green]Success![/] Welcome back, [bold]{data['user']['name']}[/]. Access token saved securely.")
         else:
             err_msg = response.json().get('message', 'Check your credentials.')
@@ -552,6 +651,7 @@ def login():
         res = client.get_profile()
         if res.status_code == 200:
             data = res.json()
+            client.save_session("2")
             console.print(f"[bold green]Success![/] API Token authenticated. Logged in as [bold]{data.get('name')}[/].")
         else:
             client.clear_token()

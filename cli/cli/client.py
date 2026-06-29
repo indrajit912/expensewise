@@ -119,10 +119,19 @@ class APIClient:
         except (json.JSONDecodeError, OSError):
             return None
 
+    @property
+    def session_file_path(self):
+        return os.path.expanduser('~/.expensewise/session.json')
+
     def clear_token(self):
         """Deletes local authentication credentials from keyring and files."""
         try:
             keyring.delete_password("expensewise", "api_token")
+        except Exception:
+            pass
+
+        try:
+            keyring.delete_password("expensewise", "login_password")
         except Exception:
             pass
 
@@ -131,6 +140,42 @@ class APIClient:
                 os.remove(self.token_file_path)
             except OSError:
                 pass
+
+        if os.path.exists(self.session_file_path):
+            try:
+                os.remove(self.session_file_path)
+            except OSError:
+                pass
+
+    def save_session(self, method, email=None):
+        """Saves current login session metadata and timezone-aware timestamp."""
+        from datetime import datetime, timezone
+        os.makedirs(os.path.dirname(self.session_file_path), exist_ok=True)
+        try:
+            data = {
+                'login_method': method,
+                'email': email,
+                'login_timestamp': datetime.now(timezone.utc).isoformat()
+            }
+            with open(self.session_file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+            try:
+                os.chmod(self.session_file_path, 0o600)
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
+
+    def load_session(self):
+        """Loads session metadata from local storage."""
+        if not os.path.exists(self.session_file_path):
+            return None
+        try:
+            with open(self.session_file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return None
 
     def get_headers(self):
         """Constructs headers containing the authorization Bearer token."""

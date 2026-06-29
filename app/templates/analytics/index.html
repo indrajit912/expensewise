@@ -91,7 +91,7 @@
                             <div class="d-flex align-items-start">
                                 <span class="badge bg-primary mt-1 me-2" style="width: 10px; height: 10px; border-radius: 50%; padding: 0; background-color: #4f46e5 !important;">&nbsp;</span>
                                 <div class="small">
-                                    <strong class="text-dark">Actual Total Spending (Purple Area)</strong>
+                                    <strong class="text-dark">Actual Total Spending (Purple Bars)</strong>
                                     <p class="text-muted mb-0">Represents the exact amount spent during each interval (e.g., each day, week, month, or year).</p>
                                 </div>
                             </div>
@@ -109,10 +109,18 @@
                     <div class="p-2 bg-white rounded border border-light small shadow-sm">
                         <strong class="text-dark"><i class="bi bi-calculator me-1"></i> Simple Example:</strong>
                         <p class="text-muted mb-0 mt-1">
-                            Suppose you spend <strong>$100</strong> in January, <strong>$150</strong> in February, and <strong>$350</strong> in March (e.g., due to an annual car insurance payment). Your actual March spending shows a huge spike to $350. However, your 3-period moving average for March calculates the average of these three periods: 
-                            <span class="text-dark fw-semibold">($100 + $150 + $350) / 3 = $200</span>.
-                            This shows that your typical, smoothed baseline spending is $200, making long-term trends easier to recognize.
+                            Suppose you spend <strong>₹100</strong> in January, <strong>₹150</strong> in February, and <strong>₹350</strong> in March (e.g., due to an annual car insurance payment). Your actual March spending shows a huge spike to ₹350. However, your 3-period moving average for March calculates the average of these three periods: 
+                            <span class="text-dark fw-semibold">(₹100 + ₹150 + ₹350) / 3 = ₹200</span>.
+                            This shows that your typical, smoothed baseline spending is ₹200, making long-term trends easier to recognize.
                         </p>
+                    </div>
+                    <div class="mt-2.5 small">
+                        <strong class="text-dark"><i class="bi bi-graph-up-arrow me-1"></i> What to Conclude from the Trend:</strong>
+                        <ul class="text-muted mb-0 ps-3 mt-1">
+                            <li><strong class="text-dark">Line is Rising:</strong> Your overall cost baseline is growing (lifestyle creep or rising costs). Consider reviewing discretionary categories to cut back.</li>
+                            <li><strong class="text-dark">Line is Falling:</strong> Your saving efforts are working! Your average consumption is contracting, leading to healthier savings.</li>
+                            <li><strong class="text-dark">Line is Flat/Stable:</strong> Your monthly budget requirements are steady and predictable, making it easy to project future expenses and automate savings.</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -244,7 +252,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const selectedMonths = {{ selected_months }};
     const startDateObj = new Date();
-    startDateObj.setMonth(today.getMonth() - selectedMonths);
+    startDateObj.setDate(1);
+    startDateObj.setMonth(startDateObj.getMonth() - (selectedMonths - 1));
     const startDateVal = startDateObj.toISOString().split('T')[0];
     
     const intervalSelect = document.getElementById('trend-interval');
@@ -286,27 +295,25 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const datasets = [
                 {
+                    type: 'bar',
                     label: 'Total Spending ({{ current_user.default_currency }})',
                     data: data.totals,
-                    backgroundColor: 'rgba(79, 70, 229, 0.12)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.75)',
                     borderColor: '#4f46e5',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.35,
-                    pointBackgroundColor: '#4f46e5',
-                    pointBorderColor: '#ffffff',
-                    pointHoverRadius: 6,
-                    pointRadius: 4
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.6
                 }
             ];
             
             if (maEnabled && data.moving_average && data.moving_average.length > 0) {
                 datasets.push({
+                    type: 'line',
                     label: '3-Period Moving Average',
                     data: data.moving_average,
                     backgroundColor: 'transparent',
                     borderColor: '#ef4444',
-                    borderWidth: 2,
+                    borderWidth: 2.5,
                     borderDash: [5, 5],
                     fill: false,
                     tension: 0.35,
@@ -322,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 const ctx = canvas.getContext('2d');
                 trendsChart = new Chart(ctx, {
-                    type: 'line',
+                    type: 'bar',
                     data: {
                         labels: data.labels,
                         datasets: datasets

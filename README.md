@@ -19,18 +19,17 @@
 
 1. [Project Overview](#1-project-overview)
 2. [Features](#2-features)
-3. [Screenshots](#3-screenshots-placeholder)
-4. [Technology Stack](#4-technology-stack)
-5. [Installation](#5-installation)
-6. [Maintainer Setup Guide](#6-maintainer-setup-guide)
-7. [ExpenseWise CLI](#7-expensewise-cli)
-8. [REST API Documentation](#8-rest-api-documentation)
-9. [Project Structure](#9-project-structure)
-10. [Configuration](#10-configuration)
-11. [Deployment](#11-deployment)
-12. [Contributing](#12-contributing)
-13. [Roadmap](#13-roadmap)
-14. [License](#14-license)
+3. [Technology Stack](#3-technology-stack)
+4. [Installation](#4-installation)
+5. [Maintainer Setup Guide](#5-maintainer-setup-guide)
+6. [ExpenseWise CLI](#6-expensewise-cli)
+7. [REST API Documentation](#7-rest-api-documentation)
+8. [Project Structure](#8-project-structure)
+9. [Configuration](#9-configuration)
+10. [Deployment](#10-deployment)
+11. [Contributing](#11-contributing)
+12. [Roadmap](#12-roadmap)
+13. [License](#13-license)
 
 ---
 
@@ -39,6 +38,9 @@
 ExpenseWise is built to address the privacy concerns of storing sensitive daily transactional data online. By implementing user-level encryption keys derived from active credentials, the system ensures that expense amounts, categories, and descriptions are completely unreadable in the SQLite or PostgreSQL database unless an active session is validated.
 
 Furthermore, it offers tools to automate budgeting decisions, project spending averages, and interface directly with local terminal scripts to keep developer workflows integrated.
+
+![ExpenseWise Landing Page](docs/images/website/homepage.png)
+*Figure 1: ExpenseWise web application homepage showcasing secure session gateways and developer portals.*
 
 ---
 
@@ -56,23 +58,15 @@ Furthermore, it offers tools to automate budgeting decisions, project spending a
 * **Gravatar Profile Support:** Circular user avatars calculated from secure email hashes.
 * **Responsive UI:** Clean CSS layouts with glassmorphic cards, transition animations, and dark navbar headers.
 
----
+![Main User Dashboard](docs/images/website/userdashboard.png)
+*Figure 2: The web dashboard displaying key metrics, daily spending visual trends, category breakdown charts, and current rolling summaries.*
 
-## 3. Screenshots (Placeholder)
-
-*Screenshots of the application interfaces can be viewed here:*
-
-#### Main User Dashboard
-![Dashboard Mockup](./docs/screenshots/dashboard_mockup.png)
-*(Placeholder: Displays the daily spend trend, category allocation doughnut, and rolling summaries)*
-
-#### Budget Planning Center
-![Budget Mockup](./docs/screenshots/budget_mockup.png)
-*(Placeholder: Displays the category recommendations and real-time allowance meters)*
+![Visual Analytics Dashboard](docs/images/website/analytics.png)
+*Figure 3: Spending analytics panel displaying historical budget variances and linear regression forecast trends.*
 
 ---
 
-## 4. Technology Stack
+## 3. Technology Stack
 
 * **Core Runtime:** Python (3.13+)
 * **Web Framework:** Flask (3.0+) using the Application Factory Pattern
@@ -86,7 +80,7 @@ Furthermore, it offers tools to automate budgeting decisions, project spending a
 
 ---
 
-## 5. Installation
+## 4. Installation
 
 Follow these steps to set up the development environment on your local system:
 
@@ -135,7 +129,7 @@ Access the application at [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
 
 ---
 
-## 6. Maintainer Setup Guide
+## 5. Maintainer Setup Guide
 
 This guide details commands and workflows required by maintainers to develop and deploy ExpenseWise.
 
@@ -178,9 +172,12 @@ python -m pytest
 
 ---
 
-## 7. ExpenseWise CLI
+## 6. ExpenseWise CLI
 
 `expensewise-cli` is a standalone, terminal-based personal financial assistant that communicates exclusively with the server using the versioned REST API.
+
+![ExpenseWise CLI Custom Help Menu](docs/images/cli/cli-help.png)
+*Figure 4: The custom-styled command help menu of the CLI showing formatted group listings and resources.*
 
 ### Installation
 
@@ -410,6 +407,9 @@ Display spending summaries, rolling financial indicators, and forecast projectio
   ```
   *(Note: The backward-compatible command alias `expensewise-cli analytics` can be used interchangeably.)*
 
+  ![CLI Spending Summary](docs/images/cli/cli-summary.png)
+  *Figure 5: Custom-styled spending summaries displaying daily average metrics, MoM budget difference indicators, and linear regression forecast panels.*
+
 * **Generate category allocation bar charts:**
   ```bash
   expensewise-cli chart
@@ -427,9 +427,12 @@ Display spending summaries, rolling financial indicators, and forecast projectio
   Other        | ████                            | ₹800.00 (6.5%)
 ```
 
+![CLI Category Distribution Chart](docs/images/cli/cli-chart.png)
+*Figure 6: CLI-generated spending distribution bar charts using Unicode block elements and custom-coded colors.*
+
 ---
 
-## 8. REST API Documentation
+## 7. REST API Documentation
 
 ExpenseWise provides a versioned, developer-friendly REST API for custom client integrations, shell scripting, or data analysis.
 
@@ -529,7 +532,7 @@ expensewise-cli summary --start-date 2026-01-01 --end-date 2026-05-31 --category
 
 ---
 
-## 9. Project Structure
+## 8. Project Structure
 
 ```text
 expensewise/
@@ -554,7 +557,7 @@ expensewise/
 
 ---
 
-## 10. Configuration
+## 9. Configuration
 
 Configure the application behavior using the following environment variables:
 
@@ -568,7 +571,7 @@ Configure the application behavior using the following environment variables:
 
 ---
 
-## 11. Deployment
+## 10. Deployment
 
 ### Production Flag
 When deploying in production, ensure `FLASK_DEBUG=0` is set in the production dashboard. This automatically activates the `ProductionConfig` settings, which disable local SQLite fallbacks, enforce strict HTTPS redirects using `Flask-Talisman`, and disable debug trace logging.
@@ -581,7 +584,7 @@ gunicorn -w 4 "manage:app"
 
 ---
 
-## 12. Contributing
+## 11. Contributing
 
 We welcome contributions to ExpenseWise! Please follow these guidelines:
 1. Fork the repository and create a feature branch (`git checkout -b feature/amazing-feature`).
@@ -592,7 +595,7 @@ We welcome contributions to ExpenseWise! Please follow these guidelines:
 
 ---
 
-## 13. Roadmap
+## 12. Roadmap
 
 * **Multi-Currency Aggregations:** Display dashboard analytics conversions dynamically across selected user standard currencies.
 * **Visual Budget Alerts:** Configurable system alerts when spending threshold limits exceed 80% of category budget limits.
@@ -601,6 +604,6 @@ We welcome contributions to ExpenseWise! Please follow these guidelines:
 
 ---
 
-## 14. License
+## 13. License
 
 This project is licensed under the terms of the MIT License. See the [LICENSE](./LICENSE) file for the full text. The MIT License is appropriate for this project as it permits modification, distribution, commercial use, and private hosting, allowing developers to adapt ExpenseWise for their own needs while providing the maintainer complete liability protection.

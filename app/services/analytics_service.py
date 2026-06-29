@@ -240,3 +240,59 @@ class AnalyticsService:
         
         # Ensure we don't predict negative spending
         return float(max(prediction, 0.0))
+
+    @classmethod
+    def get_spending_trends(cls, user_id, interval='month', start_date=None, end_date=None, moving_average_window=3):
+        """
+        Calculates spending trends over time aggregated by Day, Week, Month, or Year.
+        Includes rolling moving average calculation.
+        """
+        df = cls.get_user_expenses_df(user_id, start_date, end_date)
+        
+        if df.empty:
+            return {
+                'labels': [],
+                'totals': [],
+                'moving_average': []
+            }
+            
+        df['expense_date'] = pd.to_datetime(df['expense_date'])
+        
+        interval_map = {
+            'day': 'D',
+            'week': 'W-MON',
+            'month': 'MS',
+            'year': 'YS'
+        }
+        freq = interval_map.get(interval.lower(), 'MS')
+        
+        df_ts = df.set_index('expense_date').sort_index()
+        resampled = df_ts['amount'].resample(freq).sum().fillna(0.0)
+        
+        labels = []
+        for idx in resampled.index:
+            if freq == 'D':
+                labels.append(idx.strftime('%Y-%m-%d'))
+            elif freq == 'W-MON':
+                week_end = idx + timedelta(days=6)
+                labels.append(f"{idx.strftime('%b %d')} - {week_end.strftime('%b %d, %Y')}")
+            elif freq == 'MS':
+                labels.append(idx.strftime('%b %Y'))
+            elif freq == 'YS':
+                labels.append(idx.strftime('%Y'))
+                
+        totals = [float(v) for v in resampled.values]
+        
+        moving_average = []
+        if moving_average_window and len(resampled) >= 1:
+            window = min(moving_average_window, len(resampled))
+            rolling = resampled.rolling(window=window, min_periods=1).mean()
+            moving_average = [float(round(v, 2)) for v in rolling.values]
+        else:
+            moving_average = totals.copy()
+            
+        return {
+            'labels': labels,
+            'totals': totals,
+            'moving_average': moving_average
+        }

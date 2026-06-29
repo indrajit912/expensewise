@@ -220,3 +220,48 @@ def api_analytics_forecast():
         }), 200
     except Exception as e:
         return jsonify({'error': 'Server Error', 'message': str(e)}), 500
+
+
+@api.route('/v1/analytics/trends-over-time', methods=['GET'])
+@token_required
+def api_analytics_trends_over_time():
+    """Endpoint returning spending totals and moving average aggregated by interval."""
+    user_id = g.current_user.id
+    
+    from flask import request
+    from datetime import datetime
+    
+    interval = request.args.get('interval', 'month').strip().lower()
+    start_date_str = request.args.get('start_date', '').strip()
+    end_date_str = request.args.get('end_date', '').strip()
+    
+    try:
+        moving_average_window = int(request.args.get('moving_average_window', '3').strip())
+    except ValueError:
+        moving_average_window = 3
+        
+    start_date = None
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    end_date = None
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    try:
+        trends = AnalyticsService.get_spending_trends(
+            user_id,
+            interval=interval,
+            start_date=start_date,
+            end_date=end_date,
+            moving_average_window=moving_average_window
+        )
+        return jsonify(trends), 200
+    except Exception as e:
+        return jsonify({'error': 'Server Error', 'message': str(e)}), 500

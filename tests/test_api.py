@@ -152,6 +152,18 @@ def test_api_analytics(client, app, test_user, api_headers):
     assert fore_res.status_code == 200
     assert 'predicted_next_month_spending' in fore_res.get_json()
 
+    # Test trends-over-time endpoint
+    tot_res = client.get('/api/v1/analytics/trends-over-time?interval=month&moving_average_window=3', headers=api_headers)
+    assert tot_res.status_code == 200
+    tot_data = tot_res.get_json()
+    assert 'labels' in tot_data
+    assert 'totals' in tot_data
+    assert 'moving_average' in tot_data
+    assert len(tot_data['totals']) > 0
+
+    tot_daily = client.get('/api/v1/analytics/trends-over-time?interval=day', headers=api_headers)
+    assert tot_daily.status_code == 200
+
 
 def test_api_categories_and_payment_methods_crud(client, app, test_user, api_headers):
     """Tests categories and payment methods API endpoints and validation constraints."""

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, session
+from flask import Blueprint, render_template, request, session, jsonify
 from flask_login import login_required, current_user
 from app.services.analytics_service import AnalyticsService
 from datetime import date, timedelta
@@ -48,3 +48,46 @@ def index():
         forecast_spending=forecast_spending,
         selected_months=months
     )
+
+
+@analytics.route('/api/trends-over-time')
+@login_required
+def get_trends_over_time_json():
+    """Returns JSON spending trends for AJAX frontend requests."""
+    user_id = current_user.id
+    
+    interval = request.args.get('interval', 'month').strip().lower()
+    start_date_str = request.args.get('start_date', '').strip()
+    end_date_str = request.args.get('end_date', '').strip()
+    
+    try:
+        moving_average_window = int(request.args.get('moving_average_window', '3').strip())
+    except ValueError:
+        moving_average_window = 3
+        
+    from datetime import datetime
+    start_date = None
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    end_date = None
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    try:
+        trends = AnalyticsService.get_spending_trends(
+            user_id,
+            interval=interval,
+            start_date=start_date,
+            end_date=end_date,
+            moving_average_window=moving_average_window
+        )
+        return jsonify(trends), 200
+    except Exception as e:
+        return jsonify({'error': 'Server Error', 'message': str(e)}), 500

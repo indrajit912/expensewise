@@ -47,19 +47,88 @@
 
 <!-- Charts Row -->
 <div class="row g-4 mb-4">
-    <!-- Bar Chart: 6 Months -->
+    <!-- Spending Trends Over Time Chart -->
     <div class="col-lg-7">
         <div class="card glass-card border-0 bg-white p-4 h-100 shadow-sm">
-            <h3 class="h5 fw-bold font-outfit mb-3">{{ selected_months }}-Month Spending History</h3>
-            <div class="chart-container" style="position: relative; height: 300px;">
-                {% if history_amounts %}
-                    <canvas id="historyChart"></canvas>
-                {% else %}
-                    <div class="text-muted text-center pt-5">
-                        <i class="bi bi-bar-chart display-6 text-secondary d-block mb-2"></i>
-                        No transaction history available.
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start mb-3 gap-2">
+                <div>
+                    <div class="d-flex align-items-center flex-wrap gap-2">
+                        <h3 class="h5 fw-bold font-outfit mb-0">Spending Trends</h3>
+                        <button class="btn btn-link btn-sm text-decoration-none p-0 text-primary fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#learn-trends-info" aria-expanded="false" aria-controls="learn-trends-info" style="font-size: 0.85rem;">
+                            <i class="bi bi-info-circle-fill"></i> Learn about this chart
+                        </button>
                     </div>
-                {% endif %}
+                    <p class="text-muted small mb-0">Analyze spending habits grouped by interval</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <!-- Interval Selector -->
+                    <select id="trend-interval" class="form-select form-select-sm shadow-sm" style="width: auto;">
+                        <option value="day">Daily</option>
+                        <option value="week">Weekly</option>
+                        <option value="month" selected>Monthly</option>
+                        <option value="year">Yearly</option>
+                    </select>
+                    
+                    <!-- Moving Average Toggle -->
+                    <div class="form-check form-switch ms-1 mb-0">
+                        <input class="form-check-input" type="checkbox" id="trend-ma-toggle" checked>
+                        <label class="form-check-label small text-muted" for="trend-ma-toggle">MA (3p)</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Learn More Collapse Content -->
+            <div class="collapse mb-3" id="learn-trends-info">
+                <div class="p-3 bg-light rounded-3 border border-light" style="color: #374151;">
+                    <h5 class="fw-bold font-outfit text-dark mb-2" style="font-size: 0.95rem;">
+                        <i class="bi bi-lightbulb-fill text-warning me-1"></i> Understanding Your Spending Trends
+                    </h5>
+                    <p class="small mb-2">
+                        This chart helps you analyze how your outlays evolve over time. By tracking patterns, you can anticipate high-spending periods and adjust your budget proactively.
+                    </p>
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-start">
+                                <span class="badge bg-primary mt-1 me-2" style="width: 10px; height: 10px; border-radius: 50%; padding: 0; background-color: #4f46e5 !important;">&nbsp;</span>
+                                <div class="small">
+                                    <strong class="text-dark">Actual Total Spending (Purple Area)</strong>
+                                    <p class="text-muted mb-0">Represents the exact amount spent during each interval (e.g., each day, week, month, or year).</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-start">
+                                <span class="badge bg-danger mt-1 me-2" style="width: 10px; height: 10px; border-radius: 50%; padding: 0; background-color: #ef4444 !important;">&nbsp;</span>
+                                <div class="small">
+                                    <strong class="text-dark">3-Period Moving Average (Red Dashed Line)</strong>
+                                    <p class="text-muted mb-0">Calculates the average of the current and past two intervals to smooth out short-term fluctuations.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-2 bg-white rounded border border-light small shadow-sm">
+                        <strong class="text-dark"><i class="bi bi-calculator me-1"></i> Simple Example:</strong>
+                        <p class="text-muted mb-0 mt-1">
+                            Suppose you spend <strong>$100</strong> in January, <strong>$150</strong> in February, and <strong>$350</strong> in March (e.g., due to an annual car insurance payment). Your actual March spending shows a huge spike to $350. However, your 3-period moving average for March calculates the average of these three periods: 
+                            <span class="text-dark fw-semibold">($100 + $150 + $350) / 3 = $200</span>.
+                            This shows that your typical, smoothed baseline spending is $200, making long-term trends easier to recognize.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-container" style="position: relative; height: 320px;">
+                <div id="chart-loader" class="d-none position-absolute top-50 start-50 translate-middle text-center" style="z-index: 10;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted mt-2 small">Analyzing spending trends...</p>
+                </div>
+                <div id="chart-empty" class="d-none text-muted text-center pt-5">
+                    <i class="bi bi-graph-up display-6 text-secondary d-block mb-2"></i>
+                    No spending records found for the selected filters.
+                </div>
+                <canvas id="historyChart"></canvas>
             </div>
         </div>
     </div>
@@ -166,64 +235,168 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. History Bar Chart
-    {% if history_amounts %}
-    const historyCtx = document.getElementById('historyChart').getContext('2d');
-    const months = {{ history_months | tojson }};
-    const amounts = {{ history_amounts | tojson }};
+    // 1. Spending Trends Line/Area Chart Loader
+    let trendsChart = null;
+
+    // Set default dates based on the page's master months controller
+    const today = new Date();
+    const endDateVal = today.toISOString().split('T')[0];
     
-    new Chart(historyCtx, {
-        type: 'bar',
-        data: {
-            labels: months,
-            datasets: [{
-                label: 'Monthly Total Spending ({{ current_user.default_currency }})',
-                data: amounts,
-                backgroundColor: 'rgba(79, 70, 229, 0.75)',
-                borderColor: '#4f46e5',
-                borderWidth: 1,
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== undefined) {
-                                label += formatIndianNumber(context.parsed.y);
-                            }
-                            return label;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#f1f5f9' },
-                    ticks: {
-                        color: '#64748b',
-                        callback: function(value) {
-                            return formatIndianNumber(value);
-                        }
-                    }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#64748b' }
-                }
+    const selectedMonths = {{ selected_months }};
+    const startDateObj = new Date();
+    startDateObj.setMonth(today.getMonth() - selectedMonths);
+    const startDateVal = startDateObj.toISOString().split('T')[0];
+    
+    const intervalSelect = document.getElementById('trend-interval');
+    const maToggle = document.getElementById('trend-ma-toggle');
+
+    async function loadTrendsData() {
+        const interval = intervalSelect.value;
+        const startDate = startDateVal;
+        const endDate = endDateVal;
+        const maEnabled = maToggle.checked;
+        
+        const loader = document.getElementById('chart-loader');
+        const emptyState = document.getElementById('chart-empty');
+        const canvas = document.getElementById('historyChart');
+        
+        // Show loader
+        loader.classList.remove('d-none');
+        emptyState.classList.add('d-none');
+        canvas.classList.add('opacity-25');
+        
+        try {
+            const url = `/analytics/api/trends-over-time?interval=${interval}&start_date=${startDate}&end_date=${endDate}&moving_average_window=${maEnabled ? 3 : 0}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Failed to load trends data');
             }
+            const data = await response.json();
+            
+            canvas.classList.remove('opacity-25');
+            loader.classList.add('d-none');
+            
+            if (!data.labels || data.labels.length === 0) {
+                emptyState.classList.remove('d-none');
+                canvas.style.display = 'none';
+                return;
+            }
+            
+            canvas.style.display = 'block';
+            
+            const datasets = [
+                {
+                    label: 'Total Spending ({{ current_user.default_currency }})',
+                    data: data.totals,
+                    backgroundColor: 'rgba(79, 70, 229, 0.12)',
+                    borderColor: '#4f46e5',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.35,
+                    pointBackgroundColor: '#4f46e5',
+                    pointBorderColor: '#ffffff',
+                    pointHoverRadius: 6,
+                    pointRadius: 4
+                }
+            ];
+            
+            if (maEnabled && data.moving_average && data.moving_average.length > 0) {
+                datasets.push({
+                    label: '3-Period Moving Average',
+                    data: data.moving_average,
+                    backgroundColor: 'transparent',
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.35,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                });
+            }
+            
+            if (trendsChart) {
+                trendsChart.data.labels = data.labels;
+                trendsChart.data.datasets = datasets;
+                trendsChart.update();
+            } else {
+                const ctx = canvas.getContext('2d');
+                trendsChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    boxWidth: 15,
+                                    font: { family: 'Inter', size: 12 }
+                                }
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== undefined) {
+                                            label += formatIndianNumber(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: '#f1f5f9' },
+                                ticks: {
+                                    color: '#64748b',
+                                    callback: function(value) {
+                                        return formatIndianNumber(value);
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: '#64748b' }
+                            }
+                        }
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error(error);
+            loader.classList.add('d-none');
+            emptyState.classList.remove('d-none');
+            emptyState.innerHTML = '<i class="bi bi-exclamation-triangle display-6 text-danger d-block mb-2"></i> Error loading trends.';
+            canvas.style.display = 'none';
         }
+    }
+
+    // Attach listeners
+    [intervalSelect, maToggle].forEach(elem => {
+        if (elem) elem.addEventListener('change', loadTrendsData);
     });
-    {% endif %}
+
+    // Initial load
+    loadTrendsData();
 
     // 2. Category allocation Doughnut
     {% if category_dist %}

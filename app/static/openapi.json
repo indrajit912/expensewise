@@ -477,6 +477,33 @@
         }
       }
     },
+    "/v1/analytics/trends-over-time": {
+      "get": {
+        "tags": ["Reports & Analytics"],
+        "summary": "Fetch spending totals and moving average aggregated by interval",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "interval", "in": "query", "schema": { "type": "string", "enum": ["day", "week", "month", "year"], "default": "month" } },
+          { "name": "start_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "end_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "moving_average_window", "in": "query", "schema": { "type": "integer", "default": 3 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated spending totals and moving average.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "labels": ["Jan 2026", "Feb 2026", "Mar 2026"],
+                  "totals": [1200.5, 950.0, 1500.25],
+                  "moving_average": [1200.5, 1075.25, 1216.92]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/export": {
       "get": {
         "tags": ["Import/Export"],

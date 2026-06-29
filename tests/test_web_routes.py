@@ -94,20 +94,28 @@ def test_analytics_route(client, test_user):
     response = client.get('/analytics/')
     assert response.status_code == 200
     assert b'Analytics Engine' in response.data
-    assert b'6-Month Spending History' in response.data
+    assert b'Spending Trends Over Time' in response.data
     assert b'Top Allocation Categories (Past 6 Months)' in response.data
     
     # 2. Test query parameter override (12 months)
     response = client.get('/analytics/?months=12')
     assert response.status_code == 200
-    assert b'12-Month Spending History' in response.data
+    assert b'Spending Trends Over Time' in response.data
     assert b'Top Allocation Categories (Past 12 Months)' in response.data
     
     # 3. Test session persistence (should load 12 months on reload without param)
     response = client.get('/analytics/')
     assert response.status_code == 200
-    assert b'12-Month Spending History' in response.data
+    assert b'Spending Trends Over Time' in response.data
     assert b'Top Allocation Categories (Past 12 Months)' in response.data
+
+    # 4. Test the web-authenticated JSON API trends endpoint
+    response_json = client.get('/analytics/api/trends-over-time?interval=month')
+    assert response_json.status_code == 200
+    assert response_json.mimetype == 'application/json'
+    json_data = response_json.get_json()
+    assert 'labels' in json_data
+    assert 'totals' in json_data
 
 
 def test_auth_reset_views(client, test_user):

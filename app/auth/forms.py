@@ -49,7 +49,7 @@ class RegisterForm(FlaskForm):
         ('AUD', 'AUD (A$)'),
         ('CAD', 'CAD (C$)')
     ], validators=[DataRequired()], default='INR')
-    timezone = SelectField('Timezone', validators=[DataRequired()], default='UTC')
+    timezone = SelectField('Timezone', choices=[('UTC', 'UTC')], validators=[DataRequired()], default='UTC')
     submit = SubmitField('Create Account')
 
     def validate_email(self, field):

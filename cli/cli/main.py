@@ -162,6 +162,7 @@ def show_custom_help():
         "[bold yellow]Analytics and exports:[/]\n"
         "  expensewise-cli summary --category-wise --start-date 2026-05-01\n"
         "  expensewise-cli chart --start-date 2026-05-01\n"
+        "  expensewise-cli chart monthly --months 12\n"
         "  expensewise-cli export-backup my_backup.json"
     )
     console.print(Panel(examples, title="[bold cyan]Common Usage Examples[/]", border_style="dim blue", title_align="left"))

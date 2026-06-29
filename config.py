@@ -47,6 +47,10 @@ class Config:
     HERMES_API_KEY = os.environ.get('HERMES_API_KEY') or None
     HERMES_EMAILBOT_ID = os.environ.get('HERMES_EMAILBOT_ID') or None
 
+    # Cloudflare Turnstile CAPTCHA Config (defaults to Cloudflare's official testing keys that always pass)
+    TURNSTILE_SITE_KEY = os.environ.get('TURNSTILE_SITE_KEY') or '1x00000000000000000000AA'
+    TURNSTILE_SECRET_KEY = os.environ.get('TURNSTILE_SECRET_KEY') or '1x0000000000000000000000000000000AA'
+
     # Initial Admin Config
     INITIAL_ADMIN_EMAIL = os.environ.get('INITIAL_ADMIN_EMAIL') or 'indrajitghosh912@gmail.com'
     INITIAL_ADMIN_USERNAME = os.environ.get('INITIAL_ADMIN_USERNAME') or 'ghostrix'

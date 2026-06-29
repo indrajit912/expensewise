@@ -58,4 +58,39 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Add loading spinners on email-sending form submissions
+    const forms = document.querySelectorAll('form');
+    forms.forEach((form) => {
+        form.addEventListener('submit', (e) => {
+            const action = form.getAttribute('action') || '';
+            const path = window.location.pathname;
+            
+            const isEmailForm = 
+                path.includes('/support') ||
+                path.includes('/register') ||
+                path.includes('/reset_password_request') ||
+                action.includes('/resend-otp') ||
+                action.includes('/verify-otp') ||
+                path.includes('/reset_password');
+                
+            if (isEmailForm) {
+                if (form.checkValidity && !form.checkValidity()) {
+                    return;
+                }
+                
+                const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+                if (submitBtn) {
+                    setTimeout(() => {
+                        submitBtn.disabled = true;
+                        if (submitBtn.tagName === 'INPUT') {
+                            submitBtn.value = 'Sending...';
+                        } else {
+                            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Sending...';
+                        }
+                    }, 0);
+                }
+            }
+        });
+    });
 });

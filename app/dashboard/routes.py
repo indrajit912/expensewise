@@ -895,3 +895,41 @@ def api_swagger():
 def api_redoc():
     """Renders the modern ReDoc documentation viewer referencing openapi.json."""
     return render_template('dashboard/redoc.html')
+
+
+from flask_wtf import FlaskForm
+from wtforms import TextAreaField
+from wtforms.validators import DataRequired, Length
+
+class SupportForm(FlaskForm):
+    """Form to submit contact support messages."""
+    message = TextAreaField('Message', validators=[
+        DataRequired(message="Message content cannot be empty."),
+        Length(min=1, max=5000, message="Message must be between 1 and 5000 characters.")
+    ])
+
+
+@dashboard.route('/support', methods=['GET', 'POST'])
+@login_required
+def support():
+    """Renders the contact support form and handles email dispatch to administrators."""
+    form = SupportForm()
+    if form.validate_on_submit():
+        message_content = form.message.data.strip()
+        try:
+            from app.services.email_service import EmailService
+            EmailService.send_support_email(current_user, message_content)
+            
+            # Log support request for auditing purposes
+            AuditService.log(
+                "Support Message Sent",
+                f"User {current_user.username} (UUID: {current_user.id}) sent a support message."
+            )
+            
+            flash("Your message has been sent successfully to the administration team.", "success")
+            return redirect(url_for('dashboard.support'))
+        except Exception as e:
+            current_app.logger.error("Failed to send support email: %s", str(e))
+            flash("An error occurred while sending your message. Please try again later.", "danger")
+            
+    return render_template('dashboard/support.html', form=form)

@@ -60,8 +60,8 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint.startswith('dashboard.api_') %}active{% endif %}" href="{{ url_for('dashboard.api_docs') }}">
-                            <i class="bi bi-code-slash me-1"></i> API Docs
+                        <a class="nav-link {% if request.endpoint == 'dashboard.support' %}active{% endif %}" href="{{ url_for('dashboard.support') }}">
+                            <i class="bi bi-question-circle me-1"></i> Support
                         </a>
                     </li>
                     {% endif %}
